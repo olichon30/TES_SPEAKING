@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>4단계: 스피킹 녹화 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container" style="padding-bottom: 100px;">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="learn-step3.html" class="back-btn">←</a>
+            <h1 class="header-title">스피킹 녹화</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <!-- Progress -->
+        <div style="padding: 0 20px;">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 100%;"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="current">4단계</span> / 4단계 (마지막!)
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Step Header -->
+            <div class="step-header">
+                <span class="step-badge"><i class="ti ti-video"></i> 스피킹 녹화</span>
+                <h2 class="step-title">모든 문장을 읽고 녹화하세요</h2>
+            </div>
+
+            <!-- Video Preview (hidden initially) -->
+            <div class="hidden" id="previewSection">
+                <video id="videoPreview" style="width: 100%; border-radius: var(--radius-lg); background: #000;"
+                    controls></video>
+            </div>
+
+            <!-- Camera Preview -->
+            <div id="cameraSection">
+                <video id="cameraPreview"
+                    style="width: 100%; border-radius: var(--radius-lg); background: #000; transform: scaleX(-1);"
+                    autoplay muted playsinline></video>
+            </div>
+
+            <!-- Recording Timer -->
+            <div class="text-center mt-2">
+                <span id="recordingTimer" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-coral);"
+                    class="hidden">00:00</span>
+            </div>
+
+            <!-- Sentences Reference -->
+            <div class="card mt-2" style="max-height: 200px; overflow-y: auto;">
+                <p class="text-gray mb-1" style="font-size: 0.875rem;">읽을 문장들:</p>
+                <div id="sentenceList" style="font-size: 0.9rem;"></div>
+            </div>
+
+            <!-- Recording Controls -->
+            <div class="recording-controls" id="recordControls">
+                <button class="control-btn" onclick="retryRecording()" id="retryBtn" style="visibility: hidden;"><i
+                        class="ti ti-refresh"></i></button>
+                <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()"><i class="ti ti-video"
+                        style="font-size: 2rem;"></i></button>
+                <button class="control-btn" onclick="saveRecording()" id="saveBtn" style="visibility: hidden;"><i
+                        class="ti ti-device-floppy"></i></button>
+            </div>
+            <p class="text-center text-gray" id="recordHint">버튼을 눌러 녹화 시작</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons hidden" id="actionButtons">
+            <button class="btn btn-secondary" onclick="retryRecording()">다시 녹화</button>
+            <button class="btn btn-primary" onclick="completeLesson()">학습 완료 →</button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script src="../js/recorder.js"></script>
+    <script>
+        let sentences = [];
+        let isRecording = false;
+        let recordedBlob = null;
+        let cameraStream = null;
+        let timerInterval = null;
+        let recordingSeconds = 0;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            sentences = JSON.parse(sessionStorage.getItem('currentSentences')) || [];
+            if (sentences.length === 0) {
+                window.location.href = 'learn-step1.html';
+                return;
+            }
+
+            renderSentences();
+            await initCamera();
+        });
+
+        function renderSentences() {
+            const list = document.getElementById('sentenceList');
+            list.innerHTML = sentences.map((s, i) => `
+                <div style="padding: 8px 0; border-bottom: 1px solid var(--bg-gray);">
+                    <span style="color: var(--primary); font-weight: 600;">${i + 1}.</span>
+                    ${s.en}
+                </div>
+            `).join('');
+        }
+
+        async function initCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: true
+                });
+                document.getElementById('cameraPreview').srcObject = cameraStream;
+            } catch (e) {
+                console.error('Camera error:', e);
+                showToast('카메라 접근을 허용해주세요', 'error');
+            }
+        }
+
+        async function toggleRecording() {
+            const btn = document.getElementById('recordBtn');
+            const hint = document.getElementById('recordHint');
+            const timer = document.getElementById('recordingTimer');
+            const retryBtn = document.getElementById('retryBtn');
+            const saveBtn = document.getElementById('saveBtn');
+
+            if (!isRecording) {
+                // Start recording
+                try {
+                    await recorder.startCameraRecording((time) => {
+                        timer.textContent = time;
+                    });
+
+                    isRecording = true;
+                    btn.classList.add('recording');
+                    btn.textContent = '⏹️';
+                    timer.classList.remove('hidden');
+                    hint.textContent = '녹화 중... 버튼을 눌러 중지';
+                    retryBtn.style.visibility = 'hidden';
+                    saveBtn.style.visibility = 'hidden';
+                } catch (e) {
+                    console.error('Recording error:', e);
+                    showToast('녹화를 시작할 수 없습니다', 'error');
+                }
+            } else {
+                // Stop recording
+                recordedBlob = await recorder.stopRecording();
+                isRecording = false;
+                btn.classList.remove('recording');
+                btn.textContent = '🎬';
+                timer.classList.add('hidden');
+                hint.textContent = '녹화 완료!';
+
+                if (recordedBlob) {
+                    // Show preview
+                    const url = URL.createObjectURL(recordedBlob);
+                    document.getElementById('videoPreview').src = url;
+                    document.getElementById('previewSection').classList.remove('hidden');
+                    document.getElementById('cameraSection').classList.add('hidden');
+
+                    // Show action buttons
+                    retryBtn.style.visibility = 'visible';
+                    saveBtn.style.visibility = 'visible';
+                    document.getElementById('actionButtons').classList.remove('hidden');
+                }
+            }
+        }
+
+        function retryRecording() {
+            recordedBlob = null;
+            document.getElementById('previewSection').classList.add('hidden');
+            document.getElementById('cameraSection').classList.remove('hidden');
+            document.getElementById('actionButtons').classList.add('hidden');
+            document.getElementById('recordHint').textContent = '버튼을 눌러 녹화 시작';
+            document.getElementById('retryBtn').style.visibility = 'hidden';
+            document.getElementById('saveBtn').style.visibility = 'hidden';
+
+            initCamera();
+        }
+
+        async function saveRecording() {
+            if (!recordedBlob) return;
+
+            showLoading('Supabase에 저장 중...');
+
+            try {
+                const student = JSON.parse(sessionStorage.getItem('currentStudent'));
+                const studentId = student?.id || 'demo';
+                const { data: videoUrl, error } = await uploadVideo(recordedBlob, studentId);
+
+                if (error) {
+                    hideLoading();
+                    showToast('저장 실패: ' + error.message, 'error');
+                    return;
+                }
+
+                if (videoUrl) {
+                    sessionStorage.setItem('recordingUrl', videoUrl);
+                    hideLoading();
+                    showToast('녹화가 클라우드에 저장되었습니다\n(Supabase Storage)', 'success');
+                } else {
+                    hideLoading();
+                    showToast('녹화가 저장되었습니다', 'success');
+                }
+            } catch (e) {
+                console.error('Upload error:', e);
+                hideLoading();
+                showToast('저장 중 오류가 발생했습니다', 'error');
+            }
+        }
+
+        function completeLesson() {
+            // Stop camera
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+
+            window.location.href = 'complete.html';
+        }
+
+        // Cleanup on page leave
+        window.addEventListener('beforeunload', () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+
+</html>

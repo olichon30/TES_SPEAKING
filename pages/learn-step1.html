@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>1단계: 예문 보기 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container" style="padding-bottom: 100px;">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="unit.html" class="back-btn">×</a>
+            <h1 class="header-title" id="unitName">Unit</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <!-- Progress -->
+        <div style="padding: 0 20px;">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 25%;"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="current">1단계</span> / 4단계
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Step Header -->
+            <div class="step-header">
+                <span class="step-badge"><i class="ti ti-book"></i> 예문 보기</span>
+                <h2 class="step-title">문장을 터치하여 발음을 들어보세요</h2>
+            </div>
+
+            <!-- Sentence List -->
+            <div class="sentence-list" id="sentenceList">
+                <!-- Will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="action-buttons">
+            <button class="btn btn-primary btn-large btn-block" onclick="goToStep2()">
+                다음 단계로 →
+            </button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script src="../js/tts.js"></script>
+    <script>
+        let sentences = [];
+        let playingId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const unit = JSON.parse(sessionStorage.getItem('currentUnit'));
+            if (unit) {
+                document.getElementById('unitName').textContent = unit.name;
+            }
+
+            // Load sentences from sessionStorage (set by unit.html)
+            const storedSentences = sessionStorage.getItem('currentSentences');
+            if (storedSentences) {
+                try {
+                    sentences = JSON.parse(storedSentences);
+                } catch (e) {
+                    console.error('Failed to parse sentences:', e);
+                }
+            }
+
+            // Fallback sample if no data
+            if (sentences.length === 0) {
+                sentences = [
+                    { en: 'Hello, nice to meet you.', kr: '안녕하세요, 만나서 반갑습니다.' },
+                    { en: 'I am a student.', kr: '저는 학생입니다.' }
+                ];
+                sessionStorage.setItem('currentSentences', JSON.stringify(sentences));
+            }
+
+            renderSentences();
+        });
+
+        function renderSentences() {
+            const list = document.getElementById('sentenceList');
+
+            if (sentences.length === 0) {
+                list.innerHTML = `
+                    <div class="card text-center" style="padding: 40px;">
+                        <p class="text-gray">문장 데이터가 없습니다</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = sentences.map((s, idx) => `
+                <div class="sentence-item" id="sentence-${idx}" onclick="playSentence(${idx})">
+                    <span class="sentence-num">${idx + 1}</span>
+                    <div class="sentence-text">
+                        <div class="sentence-text-en">${s.en}</div>
+                        <div class="sentence-text-kr">${s.kr}</div>
+                    </div>
+                    <span class="sentence-play"><i class="ti ti-volume"></i></span>
+                </div>
+            `).join('');
+        }
+
+        async function playSentence(idx) {
+            const sentence = sentences[idx];
+            const item = document.getElementById(`sentence-${idx}`);
+
+            // Remove active from all
+            document.querySelectorAll('.sentence-item').forEach(el => el.classList.remove('active'));
+
+            // Add active to current
+            item.classList.add('active');
+
+            // Play TTS
+            if (typeof tts !== 'undefined' && tts) {
+                try {
+                    await tts.speak(sentence.en, { rate: 0.85 });
+                } catch (e) {
+                    console.error('TTS Error:', e);
+                }
+            }
+        }
+
+        function goToStep2() {
+            window.location.href = 'learn-step2.html';
+        }
+    </script>
+</body>
+
+</html>

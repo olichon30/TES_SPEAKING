@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>3단계: 한→영 말하기 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container" style="padding-bottom: 100px;">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="learn-step2.html" class="back-btn">←</a>
+            <h1 class="header-title">한→영 말하기</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <!-- Progress -->
+        <div style="padding: 0 20px;">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 75%;"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="current">3단계</span> / 4단계
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Step Header -->
+            <div class="step-header">
+                <span class="step-badge"><i class="ti ti-message-circle"></i> 한→영 말하기</span>
+                <h2 class="step-title">한국어를 영어로 말해보세요</h2>
+            </div>
+
+            <!-- Korean Sentence Card -->
+            <div class="sentence-card">
+                <div class="sentence-kr" id="sentenceKr"
+                    style="font-size: 1.5rem; font-weight: 600; color: var(--text-dark);">
+                    안녕하세요
+                </div>
+                <div class="sentence-en hidden" id="sentenceEn"
+                    style="font-size: 1.25rem; color: var(--primary); margin-top: 16px;">
+                    Hello
+                </div>
+            </div>
+
+            <!-- Show Answer Button -->
+            <button class="btn btn-outline btn-block" id="showAnswerBtn" onclick="toggleAnswer()">
+                <i class="ti ti-bulb"></i> 정답 보기
+            </button>
+
+            <!-- Self Evaluation -->
+            <div class="hidden mt-3" id="evalSection">
+                <p class="text-center text-gray mb-2">이 문장을 얼마나 잘 말했나요?</p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button class="btn btn-secondary" onclick="evaluate('hard')"
+                        style="flex: 1; background: #FECACA;">어려워요 😓</button>
+                    <button class="btn btn-secondary" onclick="evaluate('ok')"
+                        style="flex: 1; background: #FEF3C7;">보통이에요 😐</button>
+                    <button class="btn btn-secondary" onclick="evaluate('good')"
+                        style="flex: 1; background: #BBF7D0;">잘했어요 😊</button>
+                </div>
+            </div>
+
+            <!-- Sentence Counter -->
+            <p class="text-center mt-3" style="color: var(--primary); font-weight: 600;">
+                <span id="currentIndex">1</span> / <span id="totalCount">5</span> 문장
+            </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="btn btn-secondary" onclick="prevSentence()">이전</button>
+            <button class="btn btn-primary" onclick="nextSentence()" id="nextBtn">다음</button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let sentences = [];
+        let currentIndex = 0;
+        let answerVisible = false;
+        let evaluations = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            sentences = JSON.parse(sessionStorage.getItem('currentSentences')) || [];
+            if (sentences.length === 0) {
+                window.location.href = 'learn-step1.html';
+                return;
+            }
+
+            document.getElementById('totalCount').textContent = sentences.length;
+            updateSentence();
+        });
+
+        function updateSentence() {
+            const s = sentences[currentIndex];
+            document.getElementById('sentenceKr').textContent = s.kr;
+            document.getElementById('sentenceEn').textContent = s.en;
+            document.getElementById('currentIndex').textContent = currentIndex + 1;
+
+            // Reset state
+            answerVisible = false;
+            document.getElementById('sentenceEn').classList.add('hidden');
+            document.getElementById('showAnswerBtn').classList.remove('hidden');
+            document.getElementById('showAnswerBtn').innerHTML = '<i class="ti ti-bulb"></i> 정답 보기';
+            document.getElementById('evalSection').classList.add('hidden');
+
+            // Update next button text
+            const nextBtn = document.getElementById('nextBtn');
+            if (currentIndex === sentences.length - 1) {
+                nextBtn.textContent = '다음 단계로 →';
+            } else {
+                nextBtn.textContent = '다음';
+            }
+        }
+
+        function toggleAnswer() {
+            answerVisible = !answerVisible;
+            document.getElementById('sentenceEn').classList.toggle('hidden', !answerVisible);
+            document.getElementById('showAnswerBtn').innerHTML = answerVisible ? '<i class="ti ti-eye-off"></i> 정답 숨기기' : '<i class="ti ti-bulb"></i> 정답 보기';
+
+            if (answerVisible) {
+                document.getElementById('evalSection').classList.remove('hidden');
+            }
+        }
+
+        function evaluate(level) {
+            evaluations[currentIndex] = level;
+
+            // Auto advance to next
+            setTimeout(() => {
+                nextSentence();
+            }, 300);
+        }
+
+        function prevSentence() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateSentence();
+            }
+        }
+
+        function nextSentence() {
+            if (currentIndex < sentences.length - 1) {
+                currentIndex++;
+                updateSentence();
+            } else {
+                // Save evaluations and go to step 4
+                sessionStorage.setItem('evaluations', JSON.stringify(evaluations));
+                window.location.href = 'learn-step4.html';
+            }
+        }
+    </script>
+</body>
+
+</html>

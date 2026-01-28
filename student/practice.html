@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연습하기 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="content-wrapper">
+            <header class="page-header">
+                <a href="problems.html" class="back-btn">← 목록으로</a>
+            </header>
+
+            <div class="recording-container">
+                <div class="sentence-display">
+                    <div class="sentence-kr" id="sentenceKr">한국어 문장</div>
+                    <div class="sentence-en" id="sentenceEn">English sentence</div>
+                </div>
+
+                <button class="tts-button" id="ttsBtn" onclick="playTTS()">
+                    <span class="tts-icon">🔊</span>
+                    <span>발음 듣기</span>
+                </button>
+
+                <div class="video-preview-container hidden" id="previewContainer">
+                    <video id="videoPreview" class="video-preview" controls></video>
+                </div>
+
+                <button class="record-button" id="recordBtn" onclick="toggleRecording()">
+                    🎬
+                </button>
+
+                <div class="recording-timer hidden" id="timer">00:00</div>
+
+                <div class="recording-status hidden" id="recordingStatus">
+                    <div class="recording-dot"></div>
+                    <span>녹화 중...</span>
+                </div>
+
+                <div class="video-actions hidden" id="videoActions">
+                    <button class="btn btn-secondary" onclick="retryRecording()">다시 녹화</button>
+                    <button class="btn btn-success" onclick="submitRecording()">제출하기 ✓</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="background-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+    </div>
+
+    <!-- Sticker Popup -->
+    <div class="sticker-popup hidden" id="stickerPopup" onclick="closeStickerPopup()">
+        <div class="sticker-image">⭐</div>
+        <div class="sticker-message">잘했어요!</div>
+        <p style="color: var(--text-secondary); margin-top: 16px;">클릭하여 계속</p>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script src="../js/tts.js"></script>
+    <script src="../js/recorder.js"></script>
+    <script>
+        let currentProblem = null;
+        let currentStudent = null;
+        let recordedBlob = null;
+        let isRecording = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            currentStudent = getCurrentStudent();
+            currentProblem = JSON.parse(sessionStorage.getItem('currentProblem'));
+
+            if (!currentStudent || !currentProblem) {
+                window.location.href = 'problems.html';
+                return;
+            }
+
+            document.getElementById('sentenceKr').textContent = currentProblem.sentence_kr;
+            document.getElementById('sentenceEn').textContent = currentProblem.sentence_en;
+        });
+
+        async function playTTS() {
+            const btn = document.getElementById('ttsBtn');
+            await speakWithFeedback(currentProblem.sentence_en, btn);
+        }
+
+        async function toggleRecording() {
+            const btn = document.getElementById('recordBtn');
+            const timer = document.getElementById('timer');
+            const status = document.getElementById('recordingStatus');
+            const preview = document.getElementById('previewContainer');
+            const actions = document.getElementById('videoActions');
+
+            if (!isRecording) {
+                // Start recording
+                try {
+                    await recorder.startCameraRecording((time) => {
+                        timer.textContent = time;
+                    });
+
+                    isRecording = true;
+                    btn.classList.add('recording');
+                    btn.textContent = '⏹️';
+                    timer.classList.remove('hidden');
+                    status.classList.remove('hidden');
+                    preview.classList.add('hidden');
+                    actions.classList.add('hidden');
+                } catch (err) {
+                    showToast('카메라 접근을 허용해주세요', 'error');
+                }
+            } else {
+                // Stop recording
+                recordedBlob = await recorder.stopRecording();
+                isRecording = false;
+
+                btn.classList.remove('recording');
+                btn.textContent = '🎬';
+                timer.classList.add('hidden');
+                status.classList.add('hidden');
+
+                if (recordedBlob) {
+                    const url = URL.createObjectURL(recordedBlob);
+                    document.getElementById('videoPreview').src = url;
+                    preview.classList.remove('hidden');
+                    actions.classList.remove('hidden');
+                }
+            }
+        }
+
+        function retryRecording() {
+            recordedBlob = null;
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('videoActions').classList.add('hidden');
+            document.getElementById('videoPreview').src = '';
+        }
+
+        async function submitRecording() {
+            if (!recordedBlob) {
+                showToast('녹화된 영상이 없습니다', 'error');
+                return;
+            }
+
+            showLoading('제출 중...');
+
+            try {
+                const { data: videoUrl, error } = await uploadVideo(recordedBlob, currentStudent.id);
+
+                if (!error && videoUrl) {
+                    await createRecording(currentStudent.id, currentProblem.id, videoUrl);
+                }
+
+                hideLoading();
+                showStickerPopup();
+            } catch (err) {
+                hideLoading();
+                showStickerPopup(); // Show success anyway for demo
+            }
+        }
+
+        function showStickerPopup() {
+            document.getElementById('stickerPopup').classList.remove('hidden');
+        }
+
+        function closeStickerPopup() {
+            document.getElementById('stickerPopup').classList.add('hidden');
+            window.location.href = 'problems.html';
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>나의 클래스 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="main.html" class="back-btn">←</a>
+            <h1 class="header-title">나의 클래스</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <div class="page-content">
+            <p class="text-gray mb-2" id="pageSubtitle">클래스를 선택하세요</p>
+
+            <!-- Class/Textbook Grid -->
+            <div class="grid-2" id="contentGrid">
+                <!-- Will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="main.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-home"></i></span>
+                <span>홈</span>
+            </a>
+            <a href="class.html" class="nav-item active">
+                <span class="nav-icon"><i class="ti ti-books"></i></span>
+                <span>클래스</span>
+            </a>
+            <a href="stats.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-chart-bar"></i></span>
+                <span>통계</span>
+            </a>
+            <a href="profile.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-user"></i></span>
+                <span>프로필</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let classes = [];
+        let textbooks = [];
+        let currentView = 'classes';
+        let selectedClass = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const student = JSON.parse(sessionStorage.getItem('currentStudent'));
+            if (!student) {
+                window.location.href = '../index.html';
+                return;
+            }
+
+            // Load textbooks from Supabase
+            await loadClassData();
+
+            // ALWAYS start at class view when entering this page fresh
+            // Only restore 'textbooks' view if navigating back from unit.html
+            const cameFromUnit = document.referrer.includes('unit.html');
+            const savedView = sessionStorage.getItem('classView');
+            const savedClassId = sessionStorage.getItem('selectedClassId');
+
+            if (cameFromUnit && savedView === 'textbooks' && savedClassId) {
+                selectedClass = classes.find(c => c.id === savedClassId);
+                if (selectedClass) {
+                    currentView = 'textbooks';
+                    renderTextbooks();
+                    return;
+                }
+            }
+
+            // Default: always show classes first
+            sessionStorage.removeItem('classView');
+            sessionStorage.removeItem('selectedClassId');
+            renderClasses();
+        });
+
+        async function loadClassData() {
+            showLoading('데이터 불러오는 중...');
+
+            try {
+                // Get textbooks from Supabase
+                const { data, error } = await getTextbooks();
+
+                if (error) throw error;
+
+                textbooks = data || [];
+
+                // Each textbook from Supabase becomes a separate class
+                const textbookClasses = await Promise.all(
+                    textbooks.map(async (t) => {
+                        const { data: units } = await getUnitsByTextbook(t.id);
+                        return {
+                            id: t.id,
+                            name: t.name,
+                            icon: t.icon || '<i class="ti ti-book-filled" style="font-size: 4rem; color: var(--primary);"></i>',
+                            unitCount: units?.length || 0,
+                            isTextbook: true // Flag to skip textbook selection
+                        };
+                    })
+                );
+
+                // Sample class with demo units
+                const sampleClass = {
+                    id: 'sample',
+                    name: 'SAMPLE CLASS',
+                    icon: '<i class="ti ti-file-invoice" style="font-size: 4rem; color: var(--primary);"></i>',
+                    unitCount: 3,
+                    isTextbook: true,
+                    isDemoClass: true,
+                    sampleUnits: [
+                        {
+                            id: 'sample-1', name: 'Unit 1. 인사하기', sentences: [
+                                { en: 'Hello, how are you?', kr: '안녕, 어떻게 지내?' },
+                                { en: 'I am fine, thank you.', kr: '난 괜찮아, 고마워.' },
+                                { en: 'Nice to meet you.', kr: '만나서 반가워.' }
+                            ]
+                        },
+                        {
+                            id: 'sample-2', name: 'Unit 2. 자기소개', sentences: [
+                                { en: 'My name is Tom.', kr: '내 이름은 톰이야.' },
+                                { en: 'I am 10 years old.', kr: '나는 10살이에요.' },
+                                { en: 'I like to play soccer.', kr: '나는 축구하는 것을 좋아해.' }
+                            ]
+                        },
+                        {
+                            id: 'sample-3', name: 'Unit 3. 학교생활', sentences: [
+                                { en: 'I go to school every day.', kr: '나는 매일 학교에 가요.' },
+                                { en: 'My favorite subject is math.', kr: '내가 가장 좋아하는 과목은 수학이에요.' },
+                                { en: 'I study English hard.', kr: '나는 영어를 열심히 공부해요.' }
+                            ]
+                        }
+                    ]
+                };
+
+                // Start with SAMPLE CLASS
+                classes = [sampleClass];
+
+                // Add textbook classes
+                classes = [...classes, ...textbookClasses];
+
+            } catch (e) {
+                console.error('Failed to load textbooks:', e);
+                // Fallback to demo data with sample class
+                classes = [{
+                    id: 'sample',
+                    name: 'SAMPLE CLASS',
+                    icon: '<i class="ti ti-school"></i>',
+                    unitCount: 3,
+                    isTextbook: true,
+                    isDemoClass: true,
+                    sampleUnits: [
+                        {
+                            id: 'sample-1', name: 'Unit 1. 인사하기', sentences: [
+                                { en: 'Hello, how are you?', kr: '안녕, 어떻게 지내?' },
+                                { en: 'I am fine, thank you.', kr: '난 괜찮아, 고마워.' },
+                                { en: 'Nice to meet you.', kr: '만나서 반가워.' }
+                            ]
+                        },
+                        {
+                            id: 'sample-2', name: 'Unit 2. 자기소개', sentences: [
+                                { en: 'My name is Tom.', kr: '내 이름은 톰이야.' },
+                                { en: 'I am 10 years old.', kr: '나는 10살이에요.' },
+                                { en: 'I like to play soccer.', kr: '나는 축구하는 것을 좋아해.' }
+                            ]
+                        },
+                        {
+                            id: 'sample-3', name: 'Unit 3. 학교생활', sentences: [
+                                { en: 'I go to school every day.', kr: '나는 매일 학교에 가요.' },
+                                { en: 'My favorite subject is math.', kr: '내가 가장 좋아하는 과목은 수학이에요.' },
+                                { en: 'I study English hard.', kr: '나는 영어를 열심히 공부해요.' }
+                            ]
+                        }
+                    ]
+                }];
+            }
+
+            hideLoading();
+        }
+
+        function renderClasses() {
+            currentView = 'classes';
+            sessionStorage.setItem('classView', 'classes');
+            sessionStorage.removeItem('selectedClassId');
+
+            document.getElementById('pageSubtitle').textContent = '학습할 교과서를 선택하세요';
+            const grid = document.getElementById('contentGrid');
+
+            grid.innerHTML = classes.map(cls => `
+                <div class="unit-card card-clickable" onclick="selectClass('${cls.id}')">
+                    <div class="unit-icon">${cls.icon}</div>
+                    <div class="unit-name">${cls.name}</div>
+                    <div class="unit-progress">${cls.isDemoClass ? '샘플 학습' : cls.unitCount + '개 유닛'}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectClass(classId) {
+            selectedClass = classes.find(c => c.id === classId);
+            if (!selectedClass) return;
+
+            if (selectedClass.isDemoClass && selectedClass.sampleUnits) {
+                // Demo class - store sample data and navigate to unit.html
+                sessionStorage.setItem('currentTextbook', JSON.stringify({
+                    id: selectedClass.id,
+                    name: selectedClass.name,
+                    icon: selectedClass.icon,
+                    isSample: true
+                }));
+                sessionStorage.setItem('sampleUnits', JSON.stringify(selectedClass.sampleUnits));
+                sessionStorage.setItem('currentClass', JSON.stringify(selectedClass));
+                window.location.href = 'unit.html';
+                return;
+            }
+
+            // Textbook class - go directly to unit.html
+            sessionStorage.setItem('currentTextbook', JSON.stringify({
+                id: selectedClass.id,
+                name: selectedClass.name,
+                icon: selectedClass.icon
+            }));
+            sessionStorage.setItem('currentClass', JSON.stringify(selectedClass));
+            window.location.href = 'unit.html';
+        }
+
+        // Handle back button
+        document.querySelector('.back-btn').addEventListener('click', (e) => {
+            // Always go back to main
+        });
+    </script>
+</body>
+
+</html>

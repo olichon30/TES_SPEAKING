@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>유닛 선택 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="class.html" class="back-btn">←</a>
+            <h1 class="header-title" id="textbookName">교과서</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <div class="page-content">
+            <p class="text-gray mb-2">학습할 유닛을 선택하세요</p>
+
+            <!-- Unit List -->
+            <div id="unitList">
+                <!-- Will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="main.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-home"></i></span>
+                <span>홈</span>
+            </a>
+            <a href="class.html" class="nav-item active">
+                <span class="nav-icon"><i class="ti ti-books"></i></span>
+                <span>클래스</span>
+            </a>
+            <a href="stats.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-chart-bar"></i></span>
+                <span>통계</span>
+            </a>
+            <a href="profile.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-user"></i></span>
+                <span>프로필</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let units = [];
+        let textbook = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            textbook = JSON.parse(sessionStorage.getItem('currentTextbook'));
+            if (!textbook) {
+                window.location.href = 'class.html';
+                return;
+            }
+
+            document.getElementById('textbookName').textContent = textbook.name;
+
+            // Load units from Supabase
+            await loadUnits();
+        });
+
+        async function loadUnits() {
+            showLoading('유닛 불러오는 중...');
+
+            try {
+                // Check if this is a sample textbook
+                if (textbook.isSample) {
+                    // Load sample units from sessionStorage
+                    const sampleUnits = JSON.parse(sessionStorage.getItem('sampleUnits') || '[]');
+                    units = sampleUnits.map((u, idx) => ({
+                        id: u.id,
+                        name: u.name,
+                        sentenceCount: u.sentences?.length || 0,
+                        isSample: true,
+                        sentences: u.sentences
+                    }));
+                } else if (textbook.id && textbook.id.startsWith('demo-')) {
+                    // Old demo textbook handling
+                    units = [{ id: 'demo-unit', name: 'Unit 1: 샘플 유닛', sentenceCount: 0 }];
+                } else {
+                    // Get units from Supabase
+                    const { data, error } = await getUnitsByTextbook(textbook.id);
+                    if (error) throw error;
+                    units = data || [];
+                }
+            } catch (e) {
+                console.error('Failed to load units:', e);
+                units = [];
+            }
+
+            hideLoading();
+            renderUnits();
+        }
+
+        function renderUnits() {
+            const list = document.getElementById('unitList');
+
+            if (units.length === 0) {
+                list.innerHTML = `
+                    <div class="card text-center" style="padding: 40px;">
+                        <p class="text-gray">아직 유닛이 없습니다</p>
+                        <p class="text-gray" style="font-size: 0.875rem;">선생님이 데이터를 업로드하면 여기에 표시됩니다</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = units.map((unit, idx) => {
+                const completed = unit.completed || false;
+                return `
+                <div class="list-card card-clickable" onclick="selectUnit('${unit.id}')">
+                    <div class="list-icon" style="background: ${completed ? 'var(--primary)' : 'var(--primary-pale)'}; color: ${completed ? 'white' : 'var(--primary)'};">
+                        <i class="ti ${completed ? 'ti-check' : 'ti-book'}"></i>
+                    </div>
+                    <div class="list-content">
+                        <div class="list-title">${unit.name}</div>
+                        <div class="list-subtitle">${unit.order_num || idx + 1}번째 유닛</div>
+                    </div>
+                    <span class="list-arrow"><i class="ti ti-chevron-right"></i></span>
+                </div>
+            `}).join('');
+        }
+
+        async function selectUnit(id) {
+            const unit = units.find(u => u.id === id);
+            if (!unit) return;
+
+            showLoading('문장 불러오는 중...');
+
+            try {
+                let formattedSentences;
+
+                // Check if this is a sample unit (has sentences pre-loaded)
+                if (unit.isSample && unit.sentences) {
+                    formattedSentences = unit.sentences;
+                } else {
+                    // Get sentences for this unit from Supabase
+                    const { data: sentences, error } = await getSentencesByUnit(id);
+                    if (error) throw error;
+
+                    // Transform to expected format
+                    formattedSentences = (sentences || []).map(s => ({
+                        en: s.sentence_en,
+                        kr: s.sentence_kr || ''
+                    }));
+                }
+
+                sessionStorage.setItem('currentUnit', JSON.stringify(unit));
+                sessionStorage.setItem('currentSentences', JSON.stringify(formattedSentences));
+
+                hideLoading();
+                window.location.href = 'learn-step1.html';
+            } catch (e) {
+                console.error('Failed to load sentences:', e);
+                hideLoading();
+                showToast('문장을 불러오는데 실패했습니다', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

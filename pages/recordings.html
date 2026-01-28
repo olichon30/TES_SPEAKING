@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>녹화 영상 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .recording-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .recording-video {
+            width: 100%;
+            background: #000;
+        }
+
+        .recording-info {
+            padding: 16px;
+        }
+
+        .recording-date {
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .recording-meta {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+            margin-top: 4px;
+        }
+
+        .recording-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .action-btn.share {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .action-btn.delete {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .empty-text {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .info-banner {
+            background: var(--primary-pale);
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 20px;
+        }
+
+        .info-banner-title {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 4px;
+        }
+
+        .info-banner-text {
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="profile.html" class="back-btn">←</a>
+            <h1 class="header-title">녹화 영상</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <div class="page-content">
+            <!-- Info Banner -->
+            <div class="info-banner">
+                <div class="info-banner-title">📍 녹화 저장 위치</div>
+                <div class="info-banner-text">
+                    녹화 영상은 Supabase 클라우드 저장소에 저장됩니다.
+                    <br>저장 경로: <code>recordings/{학생ID}/{날짜}.webm</code>
+                </div>
+            </div>
+
+            <!-- Recordings List -->
+            <div id="recordingsList">
+                <!-- Will be populated dynamically -->
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="main.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-home"></i></span>
+                <span>홈</span>
+            </a>
+            <a href="class.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-books"></i></span>
+                <span>클래스</span>
+            </a>
+            <a href="stats.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-chart-bar"></i></span>
+                <span>통계</span>
+            </a>
+            <a href="profile.html" class="nav-item">
+                <span class="nav-icon"><i class="ti ti-user"></i></span>
+                <span>프로필</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let recordings = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadRecordings();
+        });
+
+        async function loadRecordings() {
+            showLoading('녹화 불러오는 중...');
+
+            try {
+                const client = await getSupabase();
+                if (!client) {
+                    hideLoading();
+                    showEmptyState();
+                    return;
+                }
+
+                // First, list all folders in the recordings bucket
+                const { data: folders, error: folderError } = await client
+                    .storage
+                    .from('recordings')
+                    .list('', { limit: 100 });
+
+                console.log('Folders response:', { folders, folderError });
+
+                if (folderError) {
+                    console.error('Folder error:', folderError);
+                    hideLoading();
+                    showEmptyState();
+                    return;
+                }
+
+                if (!folders || folders.length === 0) {
+                    console.log('No folders found');
+                    hideLoading();
+                    showEmptyState();
+                    return;
+                }
+
+                recordings = [];
+
+                // For each folder, list contents (may be files or subfolders)
+                for (const folder of folders) {
+                    console.log('Checking folder:', folder);
+
+                    if (folder.name && folder.id === null) {
+                        const { data: contents, error: contentsError } = await client
+                            .storage
+                            .from('recordings')
+                            .list(folder.name, { limit: 100 });
+
+                        console.log(`Contents of ${folder.name}:`, { contents, contentsError });
+
+                        if (contents) {
+                            for (const item of contents) {
+                                console.log('  Item:', item);
+
+                                // Check if it's a webm file
+                                if (item.name.endsWith('.webm')) {
+                                    console.log('  -> Found webm file!');
+                                    recordings.push({
+                                        name: item.name,
+                                        path: `${folder.name}/${item.name}`,
+                                        createdAt: item.created_at,
+                                        folder: folder.name
+                                    });
+                                }
+                                // Check if it's a subfolder (has name but null id, no extension)
+                                else if (item.id === null && !item.name.includes('.')) {
+                                    console.log('  -> Subfolder, scanning...');
+                                    // Scan subfolder for webm files
+                                    const { data: subContents, error: subError } = await client
+                                        .storage
+                                        .from('recordings')
+                                        .list(`${folder.name}/${item.name}`, { limit: 100 });
+
+                                    console.log(`  Subfolder contents:`, { subContents, subError });
+
+                                    if (subContents) {
+                                        for (const subFile of subContents) {
+                                            if (subFile.name.endsWith('.webm')) {
+                                                console.log('    -> Found webm in subfolder!');
+                                                recordings.push({
+                                                    name: subFile.name,
+                                                    path: `${folder.name}/${item.name}/${subFile.name}`,
+                                                    createdAt: subFile.created_at,
+                                                    folder: folder.name
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        console.log('Folder has no id, skipping');
+                    }
+                }
+
+                console.log('Total recordings found:', recordings.length, recordings);
+
+                // Sort by date (newest first)
+                recordings.sort((a, b) => {
+                    const timeA = parseInt(a.name.replace('.webm', '')) || 0;
+                    const timeB = parseInt(b.name.replace('.webm', '')) || 0;
+                    return timeB - timeA;
+                });
+
+                hideLoading();
+
+                if (recordings.length === 0) {
+                    showEmptyState();
+                    return;
+                }
+
+                renderRecordings();
+
+            } catch (e) {
+                console.error('Failed to load recordings:', e);
+                hideLoading();
+                showEmptyState();
+            }
+        }
+
+        async function getPublicUrl(path) {
+            const client = await getSupabase();
+            const { data } = client.storage.from('recordings').getPublicUrl(path);
+            return data.publicUrl;
+        }
+
+        async function renderRecordings() {
+            const list = document.getElementById('recordingsList');
+
+            if (recordings.length === 0) {
+                showEmptyState();
+                return;
+            }
+
+            let html = '';
+
+            for (const rec of recordings) {
+                const url = await getPublicUrl(rec.path);
+                const date = new Date(rec.createdAt || Date.now());
+                const dateStr = date.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                html += `
+                    <div class="recording-card" data-path="${rec.path}">
+                        <video class="recording-video" controls preload="metadata">
+                            <source src="${url}" type="video/webm">
+                        </video>
+                        <div class="recording-info">
+                            <div class="recording-date">${dateStr}</div>
+                            <div class="recording-meta">${rec.name}</div>
+                            <div class="recording-actions">
+                                <button class="action-btn share" onclick="shareRecording('${url}')">
+                                    <i class="ti ti-share"></i> 공유
+                                </button>
+                                <button class="action-btn delete" onclick="deleteRecordingFromCard(this)">
+                                    <i class="ti ti-trash"></i> 삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            list.innerHTML = html;
+        }
+
+        function showEmptyState() {
+            document.getElementById('recordingsList').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="ti ti-video-off" style="font-size: 4rem; color: var(--text-light);"></i></div>
+                    <div class="empty-title">아직 녹화가 없습니다</div>
+                    <div class="empty-text">
+                        학습 4단계에서 스피킹을 녹화하면<br>
+                        여기에 표시됩니다
+                    </div>
+                </div>
+            `;
+        }
+
+        async function shareRecording(url) {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'TES Speaking 녹화',
+                        text: '스피킹 연습 녹화',
+                        url: url
+                    });
+                } catch (e) {
+                    console.log('Share cancelled');
+                }
+            } else {
+                // Fallback: copy URL to clipboard
+                navigator.clipboard.writeText(url);
+                showToast('링크가 복사되었습니다', 'success');
+            }
+        }
+
+        async function deleteRecording(path) {
+            if (!confirm('이 녹화를 삭제하시겠습니까?')) return;
+
+            showLoading('삭제 중...');
+
+            try {
+                const client = await getSupabase();
+                console.log('Deleting path:', path);
+
+                const { error } = await client
+                    .storage
+                    .from('recordings')
+                    .remove([path]);
+
+                hideLoading();
+
+                if (error) {
+                    console.error('Delete error:', error);
+                    showToast('삭제 실패: ' + error.message, 'error');
+                    return;
+                }
+
+                showToast('녹화가 삭제되었습니다', 'success');
+                await loadRecordings();
+
+            } catch (e) {
+                console.error('Delete exception:', e);
+                hideLoading();
+                showToast('삭제 중 오류 발생', 'error');
+            }
+        }
+
+        function deleteRecordingFromCard(btn) {
+            const card = btn.closest('.recording-card');
+            const path = card.getAttribute('data-path');
+            deleteRecording(path);
+        }
+    </script>
+</body>
+
+</html>

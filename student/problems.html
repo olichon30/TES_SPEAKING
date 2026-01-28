@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문제 목록 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="content-wrapper">
+            <header class="page-header">
+                <div>
+                    <a href="login.html" class="back-btn">← 로그아웃</a>
+                    <h1 class="page-title" id="welcomeTitle">문제 목록</h1>
+                </div>
+                <div class="student-info" id="studentInfo"></div>
+            </header>
+
+            <div class="problem-grid" id="problemGrid">
+                <!-- Problems will be loaded here -->
+            </div>
+
+            <div class="empty-state hidden" id="emptyState">
+                <div class="empty-icon">📝</div>
+                <h2>아직 문제가 없습니다</h2>
+                <p>선생님이 문제를 업로드하면 여기에 표시됩니다</p>
+            </div>
+        </div>
+
+        <div class="background-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let currentStudent = null;
+        let problems = [];
+        let completedProblems = new Set();
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            currentStudent = getCurrentStudent();
+            if (!currentStudent) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            document.getElementById('welcomeTitle').textContent = `${currentStudent.name}님, 안녕하세요!`;
+            document.getElementById('studentInfo').innerHTML = `
+                <span class="status-badge completed">${currentStudent.grade}</span>
+            `;
+
+            await loadProblems();
+            await loadCompletedProblems();
+        });
+
+        async function loadProblems() {
+            showLoading('문제 불러오는 중...');
+
+            try {
+                const { data, error } = await getProblems();
+                hideLoading();
+
+                if (error || !data || data.length === 0) {
+                    // Use sample data if no problems
+                    problems = getSampleProblems();
+                } else {
+                    problems = data;
+                }
+
+                renderProblems();
+            } catch (err) {
+                hideLoading();
+                problems = getSampleProblems();
+                renderProblems();
+            }
+        }
+
+        async function loadCompletedProblems() {
+            try {
+                const { data } = await getStudentRecordings(currentStudent.id);
+                if (data) {
+                    data.forEach(r => completedProblems.add(r.problem_id));
+                    renderProblems();
+                }
+            } catch (err) { }
+        }
+
+        function renderProblems() {
+            const grid = document.getElementById('problemGrid');
+            const empty = document.getElementById('emptyState');
+
+            if (problems.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+            grid.classList.remove('hidden');
+
+            grid.innerHTML = problems.map((p, i) => `
+                <div class="problem-card ${completedProblems.has(p.id) ? 'completed' : ''}" 
+                     onclick="selectProblem('${p.id}', ${i})">
+                    <div class="problem-number">문제 ${i + 1}</div>
+                    <div class="problem-sentence-kr">${p.sentence_kr}</div>
+                    <div class="problem-sentence-en">${p.sentence_en}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectProblem(id, index) {
+            sessionStorage.setItem('currentProblem', JSON.stringify(problems[index]));
+            window.location.href = 'practice.html';
+        }
+
+        function getSampleProblems() {
+            return [
+                { id: '1', sentence_kr: '나는 학교에 갑니다.', sentence_en: 'I go to school.', order_num: 1 },
+                { id: '2', sentence_kr: '오늘 날씨가 좋습니다.', sentence_en: 'The weather is nice today.', order_num: 2 },
+                { id: '3', sentence_kr: '저는 영어를 공부합니다.', sentence_en: 'I study English.', order_num: 3 }
+            ];
+        }
+    </script>
+</body>
+
+</html>

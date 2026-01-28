@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>대시보드 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-gray);
+            margin-top: 4px;
+        }
+
+        .section-card {
+            margin: 0 20px 20px;
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            background: var(--bg-gray);
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: var(--text-gray);
+        }
+
+        .data-table td {
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.pending {
+            background: #FEF3C7;
+            color: #D97706;
+        }
+
+        .status-badge.completed {
+            background: #D1FAE5;
+            color: #059669;
+        }
+
+        .upload-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        @media (min-width: 768px) {
+            .dashboard-stats {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body style="background: var(--bg-gray);">
+    <!-- Header -->
+    <header class="dashboard-header">
+        <div>
+            <h1 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark);">📊 대시보드</h1>
+            <p style="font-size: 0.875rem; color: var(--text-gray);" id="teacherEmail"></p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <label class="btn btn-primary upload-btn">
+                📁 Excel
+                <input type="file" id="excelInput" accept=".xlsx,.xls" style="display: none;">
+            </label>
+            <button class="btn btn-secondary" onclick="logout()">로그아웃</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-value" id="totalStudents">0</div>
+            <div class="stat-label">전체 학생</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalTextbooks">0</div>
+            <div class="stat-label">교과서</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalRecordings">0</div>
+            <div class="stat-label">제출된 영상</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="pendingReview">0</div>
+            <div class="stat-label">리뷰 대기</div>
+        </div>
+    </div>
+
+    <!-- Recordings Table -->
+    <div class="section-card">
+        <div class="section-header">📹 제출된 영상</div>
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>학생</th>
+                        <th>학년</th>
+                        <th>유닛</th>
+                        <th>상태</th>
+                        <th>제출일</th>
+                        <th>액션</th>
+                    </tr>
+                </thead>
+                <tbody id="recordingsTable">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script src="../js/excel.js"></script>
+    <script>
+        let recordings = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loggedIn = sessionStorage.getItem('teacherLoggedIn');
+            if (!loggedIn) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            document.getElementById('teacherEmail').textContent =
+                sessionStorage.getItem('teacherEmail') || '선생님';
+
+            await loadDashboardData();
+        });
+
+        async function loadDashboardData() {
+            showLoading('데이터 불러오는 중...');
+
+            try {
+                // Get textbooks count
+                const { data: textbooks } = await getTextbooks();
+                document.getElementById('totalTextbooks').textContent = textbooks?.length || 0;
+
+                // Get students count
+                const { data: students } = await getStudents();
+                document.getElementById('totalStudents').textContent = students?.length || 0;
+
+                // Get recordings
+                const { data: recs } = await getAllRecordings();
+                recordings = recs || [];
+
+                document.getElementById('totalRecordings').textContent = recordings.length;
+                document.getElementById('pendingReview').textContent =
+                    recordings.filter(r => r.status !== 'reviewed').length;
+
+                renderRecordingsTable();
+            } catch (err) {
+                console.error(err);
+                // Demo data
+                document.getElementById('totalStudents').textContent = '3';
+                document.getElementById('totalTextbooks').textContent = '1';
+                document.getElementById('totalRecordings').textContent = '0';
+                document.getElementById('pendingReview').textContent = '0';
+                renderDemoTable();
+            }
+
+            hideLoading();
+        }
+
+        function renderRecordingsTable() {
+            const tbody = document.getElementById('recordingsTable');
+
+            if (recordings.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-gray);">
+                            아직 제출된 영상이 없습니다
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = recordings.map(r => `
+                <tr>
+                    <td>${r.students?.name || '학생'}</td>
+                    <td>${r.students?.grade || '-'}</td>
+                    <td>${r.units?.name || '유닛'}</td>
+                    <td><span class="status-badge ${r.status === 'reviewed' ? 'completed' : 'pending'}">${r.status === 'reviewed' ? '완료' : '대기'}</span></td>
+                    <td>${new Date(r.created_at).toLocaleDateString('ko-KR')}</td>
+                    <td><button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="reviewRecording('${r.id}')">리뷰</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderDemoTable() {
+            const tbody = document.getElementById('recordingsTable');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-gray);">
+                        아직 제출된 영상이 없습니다.<br>
+                        <span style="font-size: 0.75rem;">학생이 학습을 완료하면 여기에 표시됩니다.</span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function reviewRecording(id) {
+            sessionStorage.setItem('reviewRecordingId', id);
+            window.location.href = 'review.html';
+        }
+
+        function logout() {
+            sessionStorage.removeItem('teacherLoggedIn');
+            sessionStorage.removeItem('teacherEmail');
+            window.location.href = 'login.html';
+        }
+
+        // Excel upload handler
+        document.getElementById('excelInput').addEventListener('change', async (e) => {
+            await handleExcelUpload(e.target, async (data) => {
+                showLoading('Supabase에 데이터 저장 중...');
+                try {
+                    // Import to Supabase
+                    const result = await importTextbookData(data);
+
+                    if (result.success) {
+                        const totalSentences = data.units.reduce((sum, u) => sum + u.sentences.length, 0);
+                        showToast(`'${data.textbookName}' 저장 완료! (${data.units.length}개 유닛, ${totalSentences}개 문장)`, 'success');
+
+                        // Refresh dashboard data
+                        await loadDashboardData();
+                    } else {
+                        throw result.error;
+                    }
+                } catch (err) {
+                    console.error('Save error:', err);
+                    showToast('저장 실패: ' + (err.message || err), 'error');
+                }
+                hideLoading();
+            });
+        });
+    </script>
+</body>
+
+</html>

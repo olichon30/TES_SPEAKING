@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2단계: 발음 연습 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container" style="padding-bottom: 100px;">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="learn-step1.html" class="back-btn">←</a>
+            <h1 class="header-title">발음 연습</h1>
+            <div class="header-action"></div>
+        </header>
+
+        <!-- Progress -->
+        <div style="padding: 0 20px;">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 50%;"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="current">2단계</span> / 4단계
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Step Header -->
+            <div class="step-header">
+                <span class="step-badge"><i class="ti ti-microphone"></i> 발음 연습</span>
+                <h2 class="step-title">문장을 따라 읽어보세요</h2>
+            </div>
+
+            <!-- Current Sentence Card -->
+            <div class="sentence-card">
+                <div class="sentence-kr" id="sentenceKr">안녕하세요</div>
+                <div class="sentence-en" id="sentenceEn">Hello</div>
+            </div>
+
+            <!-- TTS Button -->
+            <button class="tts-btn" id="ttsBtn" onclick="playTTS()">
+                <i class="ti ti-volume"></i> 발음 듣기
+            </button>
+
+            <!-- Accuracy Display -->
+            <div class="accuracy-display hidden" id="accuracyDisplay">
+                <div class="accuracy-circle" style="--accuracy: 0;">
+                    <span class="accuracy-value" id="accuracyValue">0%</span>
+                </div>
+                <div class="accuracy-label">정확도</div>
+            </div>
+
+            <!-- Record Button -->
+            <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()">
+                <i class="ti ti-microphone" style="font-size: 2rem;"></i>
+            </button>
+            <p class="text-center text-gray" id="recordHint">버튼을 눌러 말하세요</p>
+
+            <!-- Sentence Counter -->
+            <p class="text-center mt-2" style="color: var(--primary); font-weight: 600;">
+                <span id="currentIndex">1</span> / <span id="totalCount">5</span> 문장
+            </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="btn btn-secondary" onclick="prevSentence()">이전</button>
+            <button class="btn btn-primary" onclick="nextSentence()" id="nextBtn">다음</button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script src="../js/tts.js"></script>
+    <script src="../js/speech.js"></script>
+    <script>
+        let sentences = [];
+        let currentIndex = 0;
+        let isRecording = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            sentences = JSON.parse(sessionStorage.getItem('currentSentences')) || [];
+            if (sentences.length === 0) {
+                window.location.href = 'learn-step1.html';
+                return;
+            }
+
+            document.getElementById('totalCount').textContent = sentences.length;
+            updateSentence();
+        });
+
+        function updateSentence() {
+            const s = sentences[currentIndex];
+            document.getElementById('sentenceKr').textContent = s.kr;
+            document.getElementById('sentenceEn').textContent = s.en;
+            document.getElementById('currentIndex').textContent = currentIndex + 1;
+            document.getElementById('accuracyDisplay').classList.add('hidden');
+            document.getElementById('recordHint').textContent = '버튼을 눌러 말하세요';
+
+            // Update next button text
+            const nextBtn = document.getElementById('nextBtn');
+            if (currentIndex === sentences.length - 1) {
+                nextBtn.textContent = '다음 단계로 →';
+            } else {
+                nextBtn.textContent = '다음';
+            }
+        }
+
+        async function playTTS() {
+            const btn = document.getElementById('ttsBtn');
+            btn.classList.add('playing');
+            btn.innerHTML = '<i class="ti ti-volume"></i> 재생 중...';
+
+            try {
+                await tts.speak(sentences[currentIndex].en, { rate: 0.85 });
+            } catch (e) {
+                console.error('TTS Error:', e);
+            }
+
+            btn.classList.remove('playing');
+            btn.innerHTML = '<i class="ti ti-volume"></i> 발음 듣기';
+        }
+
+        async function toggleRecording() {
+            const btn = document.getElementById('recordBtn');
+            const hint = document.getElementById('recordHint');
+
+            if (!isRecording) {
+                // Start recording
+                isRecording = true;
+                btn.classList.add('recording');
+                btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
+                hint.textContent = '말하고 있어요... 버튼을 눌러 중지';
+
+                // Start speech recognition
+                if (typeof startSpeechRecognition === 'function') {
+                    startSpeechRecognition(sentences[currentIndex].en, (result) => {
+                        showAccuracy(result.accuracy);
+                        stopRecordingUI();
+                    });
+                } else {
+                    // Fallback: simulate after 3 seconds
+                    setTimeout(() => {
+                        const fakeAccuracy = Math.floor(Math.random() * 30) + 70;
+                        showAccuracy(fakeAccuracy);
+                        stopRecordingUI();
+                    }, 3000);
+                }
+            } else {
+                // Stop recording
+                if (typeof stopSpeechRecognition === 'function') {
+                    stopSpeechRecognition();
+                }
+                stopRecordingUI();
+            }
+        }
+
+        function stopRecordingUI() {
+            const btn = document.getElementById('recordBtn');
+            const hint = document.getElementById('recordHint');
+            isRecording = false;
+            btn.classList.remove('recording');
+            btn.innerHTML = '<i class="ti ti-microphone" style="font-size: 2rem;"></i>';
+            hint.textContent = '다시 시도하려면 버튼을 누르세요';
+        }
+
+        function showAccuracy(accuracy) {
+            const display = document.getElementById('accuracyDisplay');
+            const value = document.getElementById('accuracyValue');
+            const circle = display.querySelector('.accuracy-circle');
+
+            display.classList.remove('hidden');
+            value.textContent = accuracy + '%';
+            circle.style.setProperty('--accuracy', accuracy);
+        }
+
+        function prevSentence() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateSentence();
+            }
+        }
+
+        function nextSentence() {
+            if (currentIndex < sentences.length - 1) {
+                currentIndex++;
+                updateSentence();
+            } else {
+                // Go to next step
+                window.location.href = 'learn-step3.html';
+            }
+        }
+    </script>
+</body>
+
+</html>

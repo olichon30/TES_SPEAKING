@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>TES Speaking - 로그인</title>
+    <meta name="description" content="영어 스피킹 연습 앱">
+    <meta name="theme-color" content="#2D9596">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .login-container {
+            text-align: center;
+        }
+
+        .login-form {
+            margin-top: 32px;
+        }
+
+        .form-group {
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-logo">🎤</div>
+        <h1 class="login-title">TES Speaking</h1>
+        <p class="login-subtitle">영어 스피킹 연습을 시작하세요</p>
+
+        <form id="loginForm" class="login-form">
+            <div class="form-group">
+                <label class="form-label">이름</label>
+                <input type="text" id="studentName" class="form-input" placeholder="이름을 입력하세요" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-large btn-block" style="margin-top: 24px;">
+                시작하기
+            </button>
+        </form>
+
+        <p style="margin-top: 24px; text-align: center;">
+            <a href="teacher/login.html" style="color: var(--text-gray); font-size: 0.875rem;">
+                선생님으로 로그인 →
+            </a>
+        </p>
+    </div>
+
+    <script src="js/supabase.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('studentName').value.trim();
+
+            if (!name) {
+                showToast('이름을 입력해주세요', 'error');
+                return;
+            }
+
+            // Create temp student object (level will be set in onboarding)
+            const student = {
+                id: Date.now().toString(),
+                name: name,
+                grade: null // Will be set during onboarding
+            };
+
+            sessionStorage.setItem('currentStudent', JSON.stringify(student));
+
+            // Check if onboarding is completed
+            const onboardingComplete = localStorage.getItem('onboardingComplete_' + name);
+
+            if (onboardingComplete) {
+                // Returning user - load saved level
+                const savedLevel = localStorage.getItem('studentLevel_' + name);
+                if (savedLevel) {
+                    student.grade = savedLevel;
+                    sessionStorage.setItem('currentStudent', JSON.stringify(student));
+                }
+                window.location.href = 'pages/main.html';
+            } else {
+                // New user - go to onboarding
+                window.location.href = 'pages/onboarding.html';
+            }
+        });
+    </script>
+</body>
+
+</html>
