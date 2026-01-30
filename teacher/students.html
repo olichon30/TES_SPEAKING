@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 관리 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        .add-student-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 16px;
+            background: var(--primary-pale);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius-lg);
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .add-student-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .student-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .student-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .student-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-pale);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .student-meta {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+
+        .student-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            background: var(--bg-light);
+            color: var(--text-gray);
+        }
+
+        .action-btn:hover {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .action-btn.delete:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-gray);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-card .number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="dashboard.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title">학생 관리</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <div class="content-area" style="padding-bottom: 20px;">
+            <!-- Stats -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="number" id="totalStudents">0</div>
+                    <div class="label">전체 학생</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="activeStudents">0</div>
+                    <div class="label">녹화 완료</div>
+                </div>
+            </div>
+
+            <!-- Add Student Button -->
+            <button class="add-student-btn" onclick="showAddModal()">
+                <i class="ti ti-plus"></i> 학생 추가
+            </button>
+
+            <!-- Student List -->
+            <div class="student-list" id="studentList">
+                <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>학생 불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">학생 추가</h3>
+                <button class="close-btn" onclick="hideAddModal()">&times;</button>
+            </div>
+            <form id="addForm">
+                <div class="form-group">
+                    <label class="form-label">이름</label>
+                    <input type="text" id="newName" class="form-input" placeholder="학생 이름" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">레벨</label>
+                    <select id="newGrade" class="form-select" required>
+                        <option value="">선택하세요</option>
+                        <optgroup label="30·40">
+                            <option value="30-1">30-1</option>
+                            <option value="30-2">30-2</option>
+                            <option value="30-3">30-3</option>
+                            <option value="40-1">40-1</option>
+                            <option value="40-2">40-2</option>
+                            <option value="40-3">40-3</option>
+                        </optgroup>
+                        <optgroup label="50·60">
+                            <option value="50-1">50-1</option>
+                            <option value="50-2">50-2</option>
+                            <option value="50-3">50-3</option>
+                            <option value="60-1">60-1</option>
+                            <option value="60-2">60-2</option>
+                            <option value="60-3">60-3</option>
+                        </optgroup>
+                        <optgroup label="80·100">
+                            <option value="80-1">80-1</option>
+                            <option value="80-2">80-2</option>
+                            <option value="80-3">80-3</option>
+                            <option value="100-1">100-1</option>
+                            <option value="100-2">100-2</option>
+                            <option value="100-3">100-3</option>
+                        </optgroup>
+                        <optgroup label="150·200">
+                            <option value="150-1">150-1</option>
+                            <option value="150-2">150-2</option>
+                            <option value="150-3">150-3</option>
+                            <option value="200-1">200-1</option>
+                            <option value="200-2">200-2</option>
+                            <option value="200-3">200-3</option>
+                        </optgroup>
+                        <option value="기타">N/A (레벨 없음)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">추가</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let allStudents = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStudents();
+
+            document.getElementById('addForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await addStudent();
+            });
+        });
+
+        async function loadStudents() {
+            try {
+                const { data: students, error } = await getStudents();
+
+                if (error) {
+                    console.error('Load error:', error);
+                }
+
+                allStudents = students || [];
+
+                document.getElementById('totalStudents').textContent = allStudents.length;
+
+                // Count students with recordings (placeholder)
+                document.getElementById('activeStudents').textContent = '0';
+
+                renderStudents();
+            } catch (err) {
+                console.error('Load error:', err);
+            }
+        }
+
+        function renderStudents() {
+            const list = document.getElementById('studentList');
+
+            if (allStudents.length === 0) {
+                list.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                        <i class="ti ti-users" style="font-size: 3rem; color: var(--text-light);"></i>
+                        <p>등록된 학생이 없습니다</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = allStudents.map(s => `
+                <div class="student-card">
+                    <div class="student-avatar">${s.name.charAt(0)}</div>
+                    <div class="student-info">
+                        <div class="student-name">${s.name}</div>
+                        <div class="student-meta">${s.grade || '학년 미지정'}</div>
+                    </div>
+                    <div class="student-actions">
+                        <button class="action-btn" onclick="viewStudent('${s.id}')" title="녹화 보기">
+                            <i class="ti ti-video"></i>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteStudent('${s.id}')" title="삭제">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('show');
+        }
+
+        function hideAddModal() {
+            document.getElementById('addModal').classList.remove('show');
+            document.getElementById('addForm').reset();
+        }
+
+        async function addStudent() {
+            const name = document.getElementById('newName').value.trim();
+            const grade = document.getElementById('newGrade').value;
+
+            if (!name || !grade) {
+                showToast('모든 정보를 입력해주세요', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await createStudent(name, grade);
+
+                if (error) throw error;
+
+                showToast('학생이 추가되었습니다', 'success');
+                hideAddModal();
+                await loadStudents();
+            } catch (err) {
+                console.error('Add error:', err);
+                showToast('추가 실패', 'error');
+            }
+        }
+
+        async function deleteStudent(id) {
+            if (!confirm('이 학생을 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client.from('students').delete().eq('id', id);
+
+                if (error) throw error;
+
+                showToast('삭제되었습니다', 'success');
+                await loadStudents();
+            } catch (err) {
+                console.error('Delete error:', err);
+                showToast('삭제 실패', 'error');
+            }
+        }
+
+        function viewStudent(id) {
+            const student = allStudents.find(s => s.id === id);
+            if (student) {
+                sessionStorage.setItem('viewingStudentId', student.id);
+                sessionStorage.setItem('viewingStudentName', student.name);
+                window.location.href = 'student-recordings.html';
+            }
+        }
+    </script>
+</body>
+
+</html>

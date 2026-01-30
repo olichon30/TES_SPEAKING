@@ -161,6 +161,7 @@
 
                 sessionStorage.setItem('currentUnit', JSON.stringify(unit));
                 sessionStorage.setItem('currentSentences', JSON.stringify(formattedSentences));
+                sessionStorage.setItem('currentUnitTitle', unit.title || 'Unit');
 
                 hideLoading();
                 window.location.href = 'learn-step1.html';

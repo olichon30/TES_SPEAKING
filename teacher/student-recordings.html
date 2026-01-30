@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 녹화 보기 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        .student-header {
+            background: var(--primary-pale);
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .student-avatar-large {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .student-details h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-dark);
+        }
+
+        .student-details p {
+            margin: 4px 0 0;
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+
+        .recording-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .recording-item {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .recording-video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+        }
+
+        .recording-details {
+            padding: 16px;
+        }
+
+        .recording-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .recording-date {
+            font-size: 0.85rem;
+            color: var(--text-gray);
+            margin-bottom: 12px;
+        }
+
+        .script-section {
+            background: var(--bg-light);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .script-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 4px;
+        }
+
+        .lang-btn {
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            background: var(--bg-white);
+            color: var(--text-gray);
+        }
+
+        .lang-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .script-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-dark);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .script-content p {
+            margin: 4px 0;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .action-row .btn {
+            flex: 1;
+            font-size: 0.85rem;
+            padding: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="dashboard.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title">녹화 보기</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <div class="content-area" style="padding-bottom: 20px;">
+            <!-- Student Info -->
+            <div class="student-header">
+                <div class="student-avatar-large" id="studentAvatar">-</div>
+                <div class="student-details">
+                    <h2 id="studentName">학생 이름</h2>
+                    <p id="recordingCount">녹화 0개</p>
+                </div>
+            </div>
+
+            <!-- Recording List -->
+            <div class="recording-list" id="recordingList">
+                <div class="empty-state">
+                    <i class="ti ti-loader empty-icon" style="animation: spin 1s linear infinite;"></i>
+                    <p>녹화 불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let recordings = [];
+        let studentId = '';
+        let studentName = '';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            studentId = sessionStorage.getItem('viewingStudentId');
+            studentName = sessionStorage.getItem('viewingStudentName');
+
+            if (!studentId || !studentName) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            document.getElementById('studentName').textContent = studentName;
+            document.getElementById('studentAvatar').textContent = studentName.charAt(0);
+
+            await loadRecordings();
+        });
+
+        async function loadRecordings() {
+            try {
+                console.log('🎬 Loading recordings for studentId:', studentId);
+
+                const client = await getSupabase();
+                if (!client) {
+                    console.error('🎬 Supabase client not available');
+                    return;
+                }
+
+                // Get recordings for this student
+                const { data: files, error } = await client
+                    .storage
+                    .from('recordings')
+                    .list(studentId, { limit: 100 });
+
+                console.log('🎬 Storage list result:', { files, error });
+
+                if (error) throw error;
+
+                recordings = (files || [])
+                    .filter(f => f.name.endsWith('.webm'))
+                    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+                console.log('🎬 Filtered recordings:', recordings);
+
+                document.getElementById('recordingCount').textContent = `녹화 ${recordings.length}개`;
+
+                if (recordings.length === 0) {
+                    document.getElementById('recordingList').innerHTML = `
+                        <div class="empty-state">
+                            <i class="ti ti-video-off empty-icon"></i>
+                            <h3>녹화가 없습니다</h3>
+                            <p style="color: var(--text-gray);">아직 이 학생의 녹화가 없습니다</p>
+                            <p style="font-size: 0.8rem; color: var(--text-light);">Student ID: ${studentId}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                renderRecordings();
+
+            } catch (e) {
+                console.error('🎬 Load recordings error:', e);
+            }
+        }
+
+        async function renderRecordings() {
+            const list = document.getElementById('recordingList');
+            const client = await getSupabase();
+
+            let html = '';
+
+            for (const rec of recordings) {
+                const path = `${studentId}/${rec.name}`;
+                const { data } = client.storage.from('recordings').getPublicUrl(path);
+                const url = data.publicUrl;
+
+                const date = rec.created_at
+                    ? new Date(rec.created_at).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                    : '날짜 없음';
+
+                // Parse filename for Unit info
+                const unitMatch = rec.name.match(/_U(\d+)_/);
+                const unitNum = unitMatch ? `Unit ${unitMatch[1]}` : '녹화';
+
+                html += `
+                    <div class="recording-item">
+                        <video class="recording-video" controls preload="metadata">
+                            <source src="${url}" type="video/webm">
+                        </video>
+                        <div class="recording-details">
+                            <div class="recording-title">${unitNum}</div>
+                            <div class="recording-date">${date}</div>
+                            
+                            <div class="script-section" id="script-${rec.name.replace(/\W/g, '')}">
+                                <div class="script-header">
+                                    <span class="script-title">📝 학습 스크립트</span>
+                                    <div class="lang-toggle">
+                                        <button class="lang-btn active" onclick="toggleLang(this, 'en')">영어</button>
+                                        <button class="lang-btn" onclick="toggleLang(this, 'kr')">한국어</button>
+                                    </div>
+                                </div>
+                                <div class="script-content">
+                                    <p style="color: var(--text-gray); font-style: italic;">스크립트 정보 없음</p>
+                                </div>
+                            </div>
+
+                            <div class="action-row">
+                                <button class="btn btn-secondary" onclick="downloadVideo('${url}', '${rec.name}')">
+                                    <i class="ti ti-download"></i> 다운로드
+                                </button>
+                                <button class="btn btn-secondary" onclick="deleteVideo('${path}')">
+                                    <i class="ti ti-trash"></i> 삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            list.innerHTML = html;
+        }
+
+        function toggleLang(btn, lang) {
+            const parent = btn.closest('.lang-toggle');
+            parent.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // TODO: Toggle script content between EN/KR
+        }
+
+        async function downloadVideo(url, filename) {
+            try {
+                showToast('다운로드 준비 중...', 'info');
+                const response = await fetch(url);
+                const blob = await response.blob();
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
+                showToast('다운로드 시작됨', 'success');
+            } catch (e) {
+                showToast('다운로드 실패', 'error');
+            }
+        }
+
+        async function deleteVideo(path) {
+            if (!confirm('이 녹화를 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client.storage.from('recordings').remove([path]);
+
+                if (error) throw error;
+
+                showToast('삭제되었습니다', 'success');
+                await loadRecordings();
+            } catch (e) {
+                console.error('Delete error:', e);
+                showToast('삭제 실패', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

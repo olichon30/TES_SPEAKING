@@ -457,15 +457,18 @@ body.app-body {
 .action-buttons {
     display: flex;
     gap: 12px;
-    padding: 20px;
+    padding: 16px 20px;
     position: fixed;
-    bottom: calc(70px + var(--safe-bottom));
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
     max-width: var(--app-max-width);
-    background: linear-gradient(to top, var(--bg-light) 80%, transparent);
+    background: var(--bg-light);
     box-sizing: border-box;
+    padding-bottom: calc(16px + var(--safe-bottom));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 100;
 }
 
 .action-buttons .btn {

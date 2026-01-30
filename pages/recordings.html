@@ -64,6 +64,11 @@
             color: var(--primary);
         }
 
+        .action-btn.download {
+            background: #DBEAFE;
+            color: #2563EB;
+        }
+
         .action-btn.delete {
             background: #FEE2E2;
             color: #DC2626;
@@ -169,6 +174,17 @@
             showLoading('녹화 불러오는 중...');
 
             try {
+                // SECURITY: Get current student ID
+                const student = JSON.parse(sessionStorage.getItem('currentStudent'));
+                const studentId = student?.id || null;
+
+                if (!studentId) {
+                    console.log('No student logged in');
+                    hideLoading();
+                    showEmptyState('로그인이 필요합니다');
+                    return;
+                }
+
                 const client = await getSupabase();
                 if (!client) {
                     hideLoading();
@@ -176,23 +192,23 @@
                     return;
                 }
 
-                // First, list all folders in the recordings bucket
-                const { data: folders, error: folderError } = await client
+                // SECURITY: Only list the current user's folder
+                const { data: userFiles, error: filesError } = await client
                     .storage
                     .from('recordings')
-                    .list('', { limit: 100 });
+                    .list(studentId, { limit: 100 });
 
-                console.log('Folders response:', { folders, folderError });
+                console.log('User files response:', { studentId, userFiles, filesError });
 
-                if (folderError) {
-                    console.error('Folder error:', folderError);
+                if (filesError) {
+                    console.error('Files error:', filesError);
                     hideLoading();
                     showEmptyState();
                     return;
                 }
 
-                if (!folders || folders.length === 0) {
-                    console.log('No folders found');
+                if (!userFiles || userFiles.length === 0) {
+                    console.log('No recordings found for user');
                     hideLoading();
                     showEmptyState();
                     return;
@@ -200,65 +216,39 @@
 
                 recordings = [];
 
-                // For each folder, list contents (may be files or subfolders)
-                for (const folder of folders) {
-                    console.log('Checking folder:', folder);
-
-                    if (folder.name && folder.id === null) {
-                        const { data: contents, error: contentsError } = await client
+                // Get all webm files in user's folder
+                for (const file of userFiles) {
+                    if (file.name.endsWith('.webm')) {
+                        recordings.push({
+                            name: file.name,
+                            path: `${studentId}/${file.name}`,
+                            createdAt: file.created_at,
+                            folder: studentId
+                        });
+                    }
+                    // Check for subfolders
+                    else if (file.id === null && !file.name.includes('.')) {
+                        const { data: subFiles } = await client
                             .storage
                             .from('recordings')
-                            .list(folder.name, { limit: 100 });
+                            .list(`${studentId}/${file.name}`, { limit: 100 });
 
-                        console.log(`Contents of ${folder.name}:`, { contents, contentsError });
-
-                        if (contents) {
-                            for (const item of contents) {
-                                console.log('  Item:', item);
-
-                                // Check if it's a webm file
-                                if (item.name.endsWith('.webm')) {
-                                    console.log('  -> Found webm file!');
+                        if (subFiles) {
+                            for (const subFile of subFiles) {
+                                if (subFile.name.endsWith('.webm')) {
                                     recordings.push({
-                                        name: item.name,
-                                        path: `${folder.name}/${item.name}`,
-                                        createdAt: item.created_at,
-                                        folder: folder.name
+                                        name: subFile.name,
+                                        path: `${studentId}/${file.name}/${subFile.name}`,
+                                        createdAt: subFile.created_at,
+                                        folder: studentId
                                     });
-                                }
-                                // Check if it's a subfolder (has name but null id, no extension)
-                                else if (item.id === null && !item.name.includes('.')) {
-                                    console.log('  -> Subfolder, scanning...');
-                                    // Scan subfolder for webm files
-                                    const { data: subContents, error: subError } = await client
-                                        .storage
-                                        .from('recordings')
-                                        .list(`${folder.name}/${item.name}`, { limit: 100 });
-
-                                    console.log(`  Subfolder contents:`, { subContents, subError });
-
-                                    if (subContents) {
-                                        for (const subFile of subContents) {
-                                            if (subFile.name.endsWith('.webm')) {
-                                                console.log('    -> Found webm in subfolder!');
-                                                recordings.push({
-                                                    name: subFile.name,
-                                                    path: `${folder.name}/${item.name}/${subFile.name}`,
-                                                    createdAt: subFile.created_at,
-                                                    folder: folder.name
-                                                });
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
-                    } else {
-                        console.log('Folder has no id, skipping');
                     }
                 }
 
-                console.log('Total recordings found:', recordings.length, recordings);
+                console.log('Total recordings found:', recordings.length);
 
                 // Sort by date (newest first)
                 recordings.sort((a, b) => {
@@ -297,6 +287,10 @@
                 return;
             }
 
+            // Check if current user is a teacher
+            const student = JSON.parse(sessionStorage.getItem('currentStudent') || '{}');
+            const isTeacher = student.role === 'teacher' || student.is_teacher === true;
+
             let html = '';
 
             for (const rec of recordings) {
@@ -322,9 +316,14 @@
                                 <button class="action-btn share" onclick="shareRecording('${url}')">
                                     <i class="ti ti-share"></i> 공유
                                 </button>
+                                <button class="action-btn download" onclick="downloadRecording('${url}', '${rec.name}')">
+                                    <i class="ti ti-download"></i> 다운로드
+                                </button>
+                                ${isTeacher ? `
                                 <button class="action-btn delete" onclick="deleteRecordingFromCard(this)">
                                     <i class="ti ti-trash"></i> 삭제
                                 </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -362,6 +361,28 @@
                 // Fallback: copy URL to clipboard
                 navigator.clipboard.writeText(url);
                 showToast('링크가 복사되었습니다', 'success');
+            }
+        }
+
+        async function downloadRecording(url, filename) {
+            try {
+                showToast('다운로드 준비 중...', 'info');
+
+                const response = await fetch(url);
+                const blob = await response.blob();
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename || 'recording.webm';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
+                showToast('다운로드 시작됨', 'success');
+            } catch (e) {
+                console.error('Download error:', e);
+                showToast('다운로드 실패', 'error');
             }
         }
 

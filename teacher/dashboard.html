@@ -3,308 +3,423 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>대시보드 - TES Speaking</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 학습 현황 - TES Speaking</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <style>
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-        }
-
         .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            margin-bottom: 20px;
         }
 
-        .dashboard-stats {
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            font-size: 0.95rem;
+        }
+
+        .stats-row {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            padding: 20px;
+            margin-bottom: 20px;
         }
 
         .stat-card {
-            background: white;
+            background: var(--bg-white);
             border-radius: var(--radius-lg);
-            padding: 20px;
+            padding: 16px;
             text-align: center;
             box-shadow: var(--shadow-sm);
         }
 
-        .stat-value {
-            font-size: 2rem;
+        .stat-card .number {
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--primary);
         }
 
-        .stat-label {
-            font-size: 0.875rem;
+        .stat-card .label {
+            font-size: 0.8rem;
             color: var(--text-gray);
-            margin-top: 4px;
         }
 
-        .section-card {
-            margin: 0 20px 20px;
-            background: white;
+        .student-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .student-card {
+            background: var(--bg-white);
             border-radius: var(--radius-lg);
+            padding: 16px;
             box-shadow: var(--shadow-sm);
-            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .section-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border);
+        .student-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .student-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-pale);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 600;
+            color: var(--primary);
+            font-size: 1.1rem;
         }
 
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
+        .student-info {
+            flex: 1;
         }
 
-        .data-table th,
-        .data-table td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
+        .student-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 1rem;
         }
 
-        .data-table th {
-            background: var(--bg-gray);
-            font-weight: 500;
-            font-size: 0.875rem;
+        .student-meta {
+            font-size: 0.8rem;
             color: var(--text-gray);
+            margin-top: 2px;
         }
 
-        .data-table td {
-            font-size: 0.875rem;
+        .student-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
         }
 
-        .status-badge {
-            display: inline-block;
+        .recording-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
             padding: 4px 10px;
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 500;
         }
 
-        .status-badge.pending {
-            background: #FEF3C7;
-            color: #D97706;
+        .recording-badge.has-recording {
+            background: #DCFCE7;
+            color: #16A34A;
         }
 
-        .status-badge.completed {
-            background: #D1FAE5;
-            color: #059669;
+        .recording-badge.no-recording {
+            background: #FEE2E2;
+            color: #DC2626;
         }
 
-        .upload-btn {
+        .last-activity {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-gray);
+        }
+
+        .filter-tabs {
             display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 4px;
         }
 
-        @media (min-width: 768px) {
-            .dashboard-stats {
-                grid-template-columns: repeat(4, 1fr);
-            }
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            background: var(--bg-light);
+            color: var(--text-gray);
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .filter-tab.active {
+            background: var(--primary);
+            color: white;
         }
     </style>
 </head>
 
-<body style="background: var(--bg-gray);">
-    <!-- Header -->
-    <header class="dashboard-header">
-        <div>
-            <h1 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark);">📊 대시보드</h1>
-            <p style="font-size: 0.875rem; color: var(--text-gray);" id="teacherEmail"></p>
-        </div>
-        <div style="display: flex; gap: 8px;">
-            <label class="btn btn-primary upload-btn">
-                📁 Excel
-                <input type="file" id="excelInput" accept=".xlsx,.xls" style="display: none;">
-            </label>
-            <button class="btn btn-secondary" onclick="logout()">로그아웃</button>
-        </div>
-    </header>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="../index.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title">학생 학습 현황</h1>
+            <button class="icon-btn" onclick="refreshData()"><i class="ti ti-refresh"></i></button>
+        </header>
 
-    <!-- Stats -->
-    <div class="dashboard-stats">
-        <div class="stat-card">
-            <div class="stat-value" id="totalStudents">0</div>
-            <div class="stat-label">전체 학생</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="totalTextbooks">0</div>
-            <div class="stat-label">교과서</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="totalRecordings">0</div>
-            <div class="stat-label">제출된 영상</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="pendingReview">0</div>
-            <div class="stat-label">리뷰 대기</div>
-        </div>
-    </div>
+        <div class="content-area" style="padding-bottom: 20px;">
+            <!-- Quick Menu (moved to top) -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+                <a href="students.html" style="text-decoration: none;">
+                    <div
+                        style="background: var(--bg-white); border-radius: var(--radius-lg); padding: 16px; text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="ti ti-users" style="font-size: 1.5rem; color: var(--primary);"></i>
+                        <p style="margin: 8px 0 0; font-size: 0.8rem; color: var(--text-dark);">학생 관리</p>
+                    </div>
+                </a>
+                <a href="textbooks.html" style="text-decoration: none;">
+                    <div
+                        style="background: var(--bg-white); border-radius: var(--radius-lg); padding: 16px; text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="ti ti-book" style="font-size: 1.5rem; color: #10B981;"></i>
+                        <p style="margin: 8px 0 0; font-size: 0.8rem; color: var(--text-dark);">교재 관리</p>
+                    </div>
+                </a>
+                <a href="classes.html" style="text-decoration: none;">
+                    <div
+                        style="background: var(--bg-white); border-radius: var(--radius-lg); padding: 16px; text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="ti ti-school" style="font-size: 1.5rem; color: #8B5CF6;"></i>
+                        <p style="margin: 8px 0 0; font-size: 0.8rem; color: var(--text-dark);">학습반</p>
+                    </div>
+                </a>
+            </div>
 
-    <!-- Recordings Table -->
-    <div class="section-card">
-        <div class="section-header">📹 제출된 영상</div>
-        <div style="overflow-x: auto;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>학생</th>
-                        <th>학년</th>
-                        <th>유닛</th>
-                        <th>상태</th>
-                        <th>제출일</th>
-                        <th>액션</th>
-                    </tr>
-                </thead>
-                <tbody id="recordingsTable">
-                </tbody>
-            </table>
+            <!-- Stats (moved below menu) -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="number" id="totalStudents">0</div>
+                    <div class="label">전체 학생</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="recordedStudents">0</div>
+                    <div class="label">녹화 완료</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="todayRecordings">0</div>
+                    <div class="label">오늘 녹화</div>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="학생 이름 검색..." oninput="filterStudents()">
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">전체</button>
+                <button class="filter-tab" data-filter="recorded" onclick="setFilter('recorded')">녹화 있음</button>
+                <button class="filter-tab" data-filter="not-recorded" onclick="setFilter('not-recorded')">녹화 없음</button>
+            </div>
+
+            <!-- Student List -->
+            <div class="student-list" id="studentList">
+                <div class="empty-state">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>학생 정보 불러오는 중...</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="../js/supabase.js"></script>
-    <script src="../js/excel.js"></script>
     <script>
-        let recordings = [];
+        let allStudents = [];
+        let studentRecordings = {};
+        let currentFilter = 'all';
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const loggedIn = sessionStorage.getItem('teacherLoggedIn');
-            if (!loggedIn) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            document.getElementById('teacherEmail').textContent =
-                sessionStorage.getItem('teacherEmail') || '선생님';
-
             await loadDashboardData();
         });
 
         async function loadDashboardData() {
-            showLoading('데이터 불러오는 중...');
-
             try {
-                // Get textbooks count
-                const { data: textbooks } = await getTextbooks();
-                document.getElementById('totalTextbooks').textContent = textbooks?.length || 0;
+                console.log('📊 Loading dashboard data...');
 
-                // Get students count
-                const { data: students } = await getStudents();
-                document.getElementById('totalStudents').textContent = students?.length || 0;
+                const client = await getSupabase();
+                console.log('📊 Supabase client:', client ? 'OK' : 'FAILED');
 
-                // Get recordings
-                const { data: recs } = await getAllRecordings();
-                recordings = recs || [];
+                if (!client) {
+                    document.getElementById('studentList').innerHTML = `
+                        <div class="empty-state">
+                            <p>데이터베이스 연결 실패</p>
+                        </div>
+                    `;
+                    return;
+                }
 
-                document.getElementById('totalRecordings').textContent = recordings.length;
-                document.getElementById('pendingReview').textContent =
-                    recordings.filter(r => r.status !== 'reviewed').length;
+                // Get all students
+                const { data: students, error } = await client
+                    .from('students')
+                    .select('*')
+                    .order('name', { ascending: true });
 
-                renderRecordingsTable();
-            } catch (err) {
-                console.error(err);
-                // Demo data
-                document.getElementById('totalStudents').textContent = '3';
-                document.getElementById('totalTextbooks').textContent = '1';
-                document.getElementById('totalRecordings').textContent = '0';
-                document.getElementById('pendingReview').textContent = '0';
-                renderDemoTable();
+                console.log('📊 Students query result:', { students, error });
+
+                if (error) {
+                    console.error('📊 Students query error:', error);
+                    throw error;
+                }
+
+                allStudents = students || [];
+                console.log('📊 Total students:', allStudents.length);
+
+                // Get recordings for each student
+                for (const student of allStudents) {
+                    const { data: files, error: filesError } = await client
+                        .storage
+                        .from('recordings')
+                        .list(student.id, { limit: 100 });
+
+                    console.log(`📊 Recordings for ${student.name}:`, files?.length || 0);
+
+                    const recordings = (files || []).filter(f => f.name.endsWith('.webm'));
+                    studentRecordings[student.id] = recordings;
+                }
+
+                updateStats();
+                renderStudents();
+
+            } catch (e) {
+                console.error('📊 Dashboard load error:', e);
+                document.getElementById('studentList').innerHTML = `
+                    <div class="empty-state">
+                        <p>데이터를 불러오는데 실패했습니다</p>
+                        <p style="font-size: 0.8rem; color: var(--text-light);">${e.message || e}</p>
+                    </div>
+                `;
             }
-
-            hideLoading();
         }
 
-        function renderRecordingsTable() {
-            const tbody = document.getElementById('recordingsTable');
+        function updateStats() {
+            const total = allStudents.length;
+            const recorded = allStudents.filter(s => (studentRecordings[s.id] || []).length > 0).length;
 
-            if (recordings.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-gray);">
-                            아직 제출된 영상이 없습니다
-                        </td>
-                    </tr>
+            // Count today's recordings
+            const today = new Date().toDateString();
+            let todayCount = 0;
+            for (const studentId in studentRecordings) {
+                for (const rec of studentRecordings[studentId]) {
+                    if (rec.created_at && new Date(rec.created_at).toDateString() === today) {
+                        todayCount++;
+                    }
+                }
+            }
+
+            document.getElementById('totalStudents').textContent = total;
+            document.getElementById('recordedStudents').textContent = recorded;
+            document.getElementById('todayRecordings').textContent = todayCount;
+        }
+
+        function renderStudents() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const list = document.getElementById('studentList');
+
+            let filtered = allStudents.filter(s => {
+                const matchesSearch = s.name.toLowerCase().includes(searchTerm);
+                const hasRecording = (studentRecordings[s.id] || []).length > 0;
+
+                if (currentFilter === 'recorded' && !hasRecording) return false;
+                if (currentFilter === 'not-recorded' && hasRecording) return false;
+
+                return matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                const isEmptyDatabase = allStudents.length === 0;
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <i class="ti ti-users-group" style="font-size: 3rem; color: var(--text-light);"></i>
+                        <p>${isEmptyDatabase ? '아직 등록된 학생이 없습니다' : '검색 결과가 없습니다'}</p>
+                        ${isEmptyDatabase ? '<p style="font-size: 0.85rem; color: var(--text-gray);">학생이 앱에 로그인하면 자동으로 등록됩니다</p>' : ''}
+                    </div>
                 `;
                 return;
             }
 
-            tbody.innerHTML = recordings.map(r => `
-                <tr>
-                    <td>${r.students?.name || '학생'}</td>
-                    <td>${r.students?.grade || '-'}</td>
-                    <td>${r.units?.name || '유닛'}</td>
-                    <td><span class="status-badge ${r.status === 'reviewed' ? 'completed' : 'pending'}">${r.status === 'reviewed' ? '완료' : '대기'}</span></td>
-                    <td>${new Date(r.created_at).toLocaleDateString('ko-KR')}</td>
-                    <td><button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="reviewRecording('${r.id}')">리뷰</button></td>
-                </tr>
-            `).join('');
+            list.innerHTML = filtered.map(student => {
+                const recordings = studentRecordings[student.id] || [];
+                const hasRecording = recordings.length > 0;
+                const lastRecording = recordings.sort((a, b) =>
+                    new Date(b.created_at || 0) - new Date(a.created_at || 0)
+                )[0];
+
+                const lastDate = lastRecording?.created_at
+                    ? new Date(lastRecording.created_at).toLocaleDateString('ko-KR', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })
+                    : '-';
+
+                const initial = student.name.charAt(0);
+
+                return `
+                    <div class="student-card" onclick="viewStudentRecordings('${student.id}', '${student.name}')">
+                        <div class="student-avatar">${initial}</div>
+                        <div class="student-info">
+                            <div class="student-name">${student.name}</div>
+                            <div class="student-meta">${student.grade || ''} · 녹화 ${recordings.length}개</div>
+                        </div>
+                        <div class="student-status">
+                            <span class="recording-badge ${hasRecording ? 'has-recording' : 'no-recording'}">
+                                <i class="ti ti-${hasRecording ? 'video' : 'video-off'}"></i>
+                                ${hasRecording ? '녹화 있음' : '녹화 없음'}
+                            </span>
+                            <span class="last-activity">${lastDate}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
-        function renderDemoTable() {
-            const tbody = document.getElementById('recordingsTable');
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-gray);">
-                        아직 제출된 영상이 없습니다.<br>
-                        <span style="font-size: 0.75rem;">학생이 학습을 완료하면 여기에 표시됩니다.</span>
-                    </td>
-                </tr>
-            `;
+        function filterStudents() {
+            renderStudents();
         }
 
-        function reviewRecording(id) {
-            sessionStorage.setItem('reviewRecordingId', id);
-            window.location.href = 'review.html';
-        }
-
-        function logout() {
-            sessionStorage.removeItem('teacherLoggedIn');
-            sessionStorage.removeItem('teacherEmail');
-            window.location.href = 'login.html';
-        }
-
-        // Excel upload handler
-        document.getElementById('excelInput').addEventListener('change', async (e) => {
-            await handleExcelUpload(e.target, async (data) => {
-                showLoading('Supabase에 데이터 저장 중...');
-                try {
-                    // Import to Supabase
-                    const result = await importTextbookData(data);
-
-                    if (result.success) {
-                        const totalSentences = data.units.reduce((sum, u) => sum + u.sentences.length, 0);
-                        showToast(`'${data.textbookName}' 저장 완료! (${data.units.length}개 유닛, ${totalSentences}개 문장)`, 'success');
-
-                        // Refresh dashboard data
-                        await loadDashboardData();
-                    } else {
-                        throw result.error;
-                    }
-                } catch (err) {
-                    console.error('Save error:', err);
-                    showToast('저장 실패: ' + (err.message || err), 'error');
-                }
-                hideLoading();
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
             });
-        });
+            renderStudents();
+        }
+
+        function viewStudentRecordings(studentId, studentName) {
+            sessionStorage.setItem('viewingStudentId', studentId);
+            sessionStorage.setItem('viewingStudentName', studentName);
+            window.location.href = 'student-recordings.html';
+        }
+
+        function refreshData() {
+            document.getElementById('studentList').innerHTML = `
+                <div class="empty-state">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>새로고침 중...</p>
+                </div>
+            `;
+            loadDashboardData();
+        }
     </script>
 </body>
 

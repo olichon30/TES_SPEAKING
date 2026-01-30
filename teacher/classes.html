@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습반 관리 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        .add-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 16px;
+            background: var(--primary-pale);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius-lg);
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .add-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .class-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .class-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .class-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .class-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: #EDE9FE;
+            color: #8B5CF6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .class-info {
+            flex: 1;
+        }
+
+        .class-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .class-meta {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+
+        .class-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            background: var(--bg-light);
+            color: var(--text-gray);
+        }
+
+        .action-btn:hover {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .action-btn.delete:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .student-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .student-tag {
+            padding: 4px 10px;
+            background: var(--bg-light);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        .student-tag.add {
+            background: var(--primary-pale);
+            color: var(--primary);
+            cursor: pointer;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-gray);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+
+        .student-checkbox-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 8px;
+        }
+
+        .student-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .student-checkbox:hover {
+            background: var(--bg-light);
+            border-radius: var(--radius-md);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-gray);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="dashboard.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title">학습반 관리</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <div class="content-area" style="padding-bottom: 20px;">
+            <!-- Add Button -->
+            <button class="add-btn" onclick="showAddModal()">
+                <i class="ti ti-plus"></i> 학습반 추가
+            </button>
+
+            <!-- Class List -->
+            <div class="class-list" id="classList">
+                <div class="empty-state">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">학습반 추가</h3>
+                <button class="close-btn" onclick="hideAddModal()">&times;</button>
+            </div>
+            <form id="addForm">
+                <div class="form-group">
+                    <label class="form-label">학습반 이름</label>
+                    <input type="text" id="className" class="form-input" placeholder="예: A지역 초등, B지역 중등" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">학생 선택</label>
+                    <div class="student-checkbox-list" id="studentCheckboxList">
+                        <div style="text-align: center; padding: 20px; color: var(--text-gray);">
+                            학생 불러오는 중...
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">추가</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="editModalTitle">학생 편집</h3>
+                <button class="close-btn" onclick="hideEditModal()">&times;</button>
+            </div>
+            <div class="student-checkbox-list" id="editStudentList"></div>
+            <button class="btn btn-primary btn-block" style="margin-top: 16px;" onclick="saveStudents()">저장</button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let allStudents = [];
+        let allClasses = [];
+        let editingClassId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+
+            document.getElementById('addForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await addClass();
+            });
+        });
+
+        async function loadData() {
+            await Promise.all([loadStudents(), loadClasses()]);
+        }
+
+        async function loadStudents() {
+            try {
+                const { data: students, error } = await getStudents();
+                if (error) console.error('Load students error:', error);
+                allStudents = students || [];
+                renderStudentCheckboxes();
+            } catch (err) {
+                console.error('Load error:', err);
+            }
+        }
+
+        async function loadClasses() {
+            try {
+                const client = await getSupabase();
+                if (!client) {
+                    renderClasses();
+                    return;
+                }
+
+                const { data: classes, error } = await client
+                    .from('classes')
+                    .select('*')
+                    .order('name');
+
+                if (error) {
+                    console.log('Classes error:', error);
+                    allClasses = [];
+                } else {
+                    allClasses = classes || [];
+                }
+
+                renderClasses();
+            } catch (err) {
+                console.error('Load classes error:', err);
+                allClasses = [];
+                renderClasses();
+            }
+        }
+
+        function renderStudentCheckboxes(containerId = 'studentCheckboxList', selectedIds = []) {
+            const container = document.getElementById(containerId);
+
+            if (allStudents.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-gray);">등록된 학생이 없습니다</div>';
+                return;
+            }
+
+            container.innerHTML = allStudents.map(s => `
+                <label class="student-checkbox">
+                    <input type="checkbox" value="${s.id}" ${selectedIds.includes(s.id) ? 'checked' : ''}>
+                    <span>${s.name}</span>
+                    <span style="color: var(--text-light); font-size: 0.75rem;">${s.grade || ''}</span>
+                </label>
+            `).join('');
+        }
+
+        function renderClasses() {
+            const container = document.getElementById('classList');
+
+            if (allClasses.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="ti ti-school" style="font-size: 3rem; color: var(--text-light);"></i>
+                        <p>등록된 학습반이 없습니다</p>
+                        <p style="font-size: 0.85rem;">위에서 학습반을 추가하세요</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = allClasses.map(c => {
+                const studentIds = c.student_ids || [];
+                const studentNames = studentIds.map(id => {
+                    const student = allStudents.find(s => s.id === id);
+                    return student ? student.name : '';
+                }).filter(Boolean);
+
+                return `
+                    <div class="class-card">
+                        <div class="class-header">
+                            <div class="class-icon">
+                                <i class="ti ti-school"></i>
+                            </div>
+                            <div class="class-info">
+                                <div class="class-name">${c.name}</div>
+                                <div class="class-meta">${studentIds.length}명의 학생</div>
+                            </div>
+                            <div class="class-actions">
+                                <button class="action-btn" onclick="editClass('${c.id}')" title="편집">
+                                    <i class="ti ti-edit"></i>
+                                </button>
+                                <button class="action-btn delete" onclick="deleteClass('${c.id}')" title="삭제">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="student-tags">
+                            ${studentNames.slice(0, 5).map(name => `<span class="student-tag">${name}</span>`).join('')}
+                            ${studentNames.length > 5 ? `<span class="student-tag">+${studentNames.length - 5}</span>` : ''}
+                            <span class="student-tag add" onclick="editClass('${c.id}')">
+                                <i class="ti ti-plus"></i> 추가
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('show');
+            renderStudentCheckboxes();
+        }
+
+        function hideAddModal() {
+            document.getElementById('addModal').classList.remove('show');
+            document.getElementById('addForm').reset();
+        }
+
+        async function addClass() {
+            const name = document.getElementById('className').value.trim();
+            const checkboxes = document.querySelectorAll('#studentCheckboxList input[type="checkbox"]:checked');
+            const studentIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (!name) {
+                showToast('학습반 이름을 입력해주세요', 'error');
+                return;
+            }
+
+            try {
+                const client = await getSupabase();
+                if (!client) {
+                    showToast('데이터베이스 연결 실패', 'error');
+                    return;
+                }
+
+                const { data, error } = await client
+                    .from('classes')
+                    .insert([{
+                        name: name,
+                        type: 'group', // 통합 타입
+                        student_ids: studentIds
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                showToast('학습반이 추가되었습니다', 'success');
+                hideAddModal();
+                await loadClasses();
+            } catch (err) {
+                console.error('Add class error:', err);
+                showToast('추가 실패: ' + (err.message || err), 'error');
+            }
+        }
+
+        function editClass(id) {
+            editingClassId = id;
+            const classData = allClasses.find(c => c.id === id);
+            if (!classData) return;
+
+            document.getElementById('editModalTitle').textContent = `${classData.name} - 학생 편집`;
+            renderStudentCheckboxes('editStudentList', classData.student_ids || []);
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            editingClassId = null;
+        }
+
+        async function saveStudents() {
+            if (!editingClassId) return;
+
+            const checkboxes = document.querySelectorAll('#editStudentList input[type="checkbox"]:checked');
+            const studentIds = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client
+                    .from('classes')
+                    .update({ student_ids: studentIds })
+                    .eq('id', editingClassId);
+
+                if (error) throw error;
+
+                showToast('저장되었습니다', 'success');
+                hideEditModal();
+                await loadClasses();
+            } catch (err) {
+                console.error('Save error:', err);
+                showToast('저장 실패', 'error');
+            }
+        }
+
+        async function deleteClass(id) {
+            if (!confirm('이 학습반을 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client.from('classes').delete().eq('id', id);
+
+                if (error) throw error;
+
+                showToast('삭제되었습니다', 'success');
+                await loadClasses();
+            } catch (err) {
+                console.error('Delete error:', err);
+                showToast('삭제 실패', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

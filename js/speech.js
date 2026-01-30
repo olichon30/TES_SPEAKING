@@ -53,14 +53,14 @@ if (SpeechRecognition) {
 function startSpeechRecognition(target, callback) {
     if (!recognition) {
         console.warn('Speech recognition not supported');
-        // Fallback: return random accuracy after delay
-        setTimeout(() => {
-            callback({
-                transcript: target,
-                confidence: 85,
-                accuracy: Math.floor(Math.random() * 25) + 75
-            });
-        }, 2000);
+        // Return error - no fake results!
+        callback({
+            transcript: '',
+            confidence: 0,
+            accuracy: 0,
+            error: 'not-supported',
+            errorMessage: '음성인식이 지원되지 않습니다. Chrome 브라우저를 사용해주세요.'
+        });
         return;
     }
 
@@ -88,14 +88,33 @@ function calculateAccuracy(target, spoken) {
     const targetWords = target.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
     const spokenWords = spoken.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
 
+    // Count matching words (in correct position order)
     let matches = 0;
+    let targetIndex = 0;
 
-    for (const word of targetWords) {
-        if (spokenWords.includes(word)) {
-            matches++;
+    for (const spokenWord of spokenWords) {
+        // Find this word in remaining target words
+        for (let i = targetIndex; i < targetWords.length; i++) {
+            if (targetWords[i] === spokenWord) {
+                matches++;
+                targetIndex = i + 1;
+                break;
+            }
         }
     }
 
-    const accuracy = Math.round((matches / targetWords.length) * 100);
-    return Math.min(accuracy, 100);
+    // Calculate penalty for extra words
+    const extraWords = Math.max(0, spokenWords.length - targetWords.length);
+    const extraPenalty = extraWords * 0.15; // 15% penalty per extra word
+
+    // Calculate penalty for missing words
+    const missingWords = targetWords.length - matches;
+    const missingPenalty = missingWords / targetWords.length;
+
+    // Final accuracy
+    let accuracy = (matches / targetWords.length) - extraPenalty;
+    accuracy = Math.round(accuracy * 100);
+    accuracy = Math.max(0, Math.min(accuracy, 100));
+
+    return accuracy;
 }

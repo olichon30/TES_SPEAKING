@@ -17,7 +17,7 @@
 </head>
 
 <body>
-    <div class="app-container" style="padding-bottom: 100px;">
+    <div class="app-container" style="padding-bottom: 120px;">
         <!-- Header -->
         <header class="app-header">
             <a href="learn-step1.html" class="back-btn">←</a>
@@ -42,18 +42,30 @@
                 <h2 class="step-title">문장을 따라 읽어보세요</h2>
             </div>
 
-            <!-- Current Sentence Card -->
-            <div class="sentence-card">
+            <!-- Current Sentence Card with TTS icon -->
+            <div class="sentence-card" style="position: relative;">
+                <!-- TTS Icon Button - top right corner -->
+                <button id="ttsBtn" onclick="playTTS()" style="position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; 
+                           border-radius: 50%; background: var(--primary-pale); color: var(--primary);
+                           display: flex; align-items: center; justify-content: center; border: none;
+                           cursor: pointer; transition: 0.2s;">
+                    <i class="ti ti-volume" style="font-size: 1.2rem;"></i>
+                </button>
                 <div class="sentence-kr" id="sentenceKr">안녕하세요</div>
                 <div class="sentence-en" id="sentenceEn">Hello</div>
             </div>
 
-            <!-- TTS Button -->
-            <button class="tts-btn" id="ttsBtn" onclick="playTTS()">
-                <i class="ti ti-volume"></i> 발음 듣기
-            </button>
+            <!-- Comparison Result (moved here - right after sentence card) -->
+            <div id="comparisonResult" class="hidden" style="margin: 16px 0; padding: 16px; 
+                 background: var(--bg-white); border-radius: var(--radius-md); text-align: left;"></div>
 
-            <!-- Accuracy Display -->
+            <!-- Main Record Button (shown when not recorded yet) -->
+            <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()">
+                <i class="ti ti-microphone" style="font-size: 2rem;"></i>
+            </button>
+            <p class="text-center text-gray" id="recordHint">버튼을 눌러 말하세요</p>
+
+            <!-- Accuracy Display (hidden initially) -->
             <div class="accuracy-display hidden" id="accuracyDisplay">
                 <div class="accuracy-circle" style="--accuracy: 0;">
                     <span class="accuracy-value" id="accuracyValue">0%</span>
@@ -61,11 +73,12 @@
                 <div class="accuracy-label">정확도</div>
             </div>
 
-            <!-- Record Button -->
-            <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()">
-                <i class="ti ti-microphone" style="font-size: 2rem;"></i>
+            <!-- Small Retry Button (shown after recording) -->
+            <button class="hidden" id="retryBtn" onclick="toggleRecording()" style="display: flex; align-items: center; gap: 8px; margin: 16px auto;
+                       padding: 10px 20px; border-radius: 20px; background: var(--bg-gray);
+                       color: var(--text-gray); font-size: 0.9rem; border: none; cursor: pointer;">
+                <i class="ti ti-refresh"></i> 다시하기
             </button>
-            <p class="text-center text-gray" id="recordHint">버튼을 눌러 말하세요</p>
 
             <!-- Sentence Counter -->
             <p class="text-center mt-2" style="color: var(--primary); font-weight: 600;">
@@ -104,8 +117,16 @@
             document.getElementById('sentenceKr').textContent = s.kr;
             document.getElementById('sentenceEn').textContent = s.en;
             document.getElementById('currentIndex').textContent = currentIndex + 1;
+
+            // Reset UI state
             document.getElementById('accuracyDisplay').classList.add('hidden');
+            document.getElementById('comparisonResult').classList.add('hidden');
             document.getElementById('recordHint').textContent = '버튼을 눌러 말하세요';
+            document.getElementById('recordHint').classList.remove('hidden');
+
+            // Show big record button, hide retry button
+            document.getElementById('recordBtn').classList.remove('hidden');
+            document.getElementById('retryBtn').classList.add('hidden');
 
             // Update next button text
             const nextBtn = document.getElementById('nextBtn');
@@ -118,8 +139,9 @@
 
         async function playTTS() {
             const btn = document.getElementById('ttsBtn');
-            btn.classList.add('playing');
-            btn.innerHTML = '<i class="ti ti-volume"></i> 재생 중...';
+            const originalBg = btn.style.background;
+            btn.style.background = 'var(--primary)';
+            btn.style.color = 'white';
 
             try {
                 await tts.speak(sentences[currentIndex].en, { rate: 0.85 });
@@ -127,12 +149,13 @@
                 console.error('TTS Error:', e);
             }
 
-            btn.classList.remove('playing');
-            btn.innerHTML = '<i class="ti ti-volume"></i> 발음 듣기';
+            btn.style.background = originalBg || 'var(--primary-pale)';
+            btn.style.color = 'var(--primary)';
         }
 
         async function toggleRecording() {
             const btn = document.getElementById('recordBtn');
+            const retryBtn = document.getElementById('retryBtn');
             const hint = document.getElementById('recordHint');
 
             if (!isRecording) {
@@ -142,19 +165,24 @@
                 btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
                 hint.textContent = '말하고 있어요... 버튼을 눌러 중지';
 
+                // Hide previous results
+                document.getElementById('accuracyDisplay').classList.add('hidden');
+                retryBtn.classList.add('hidden');
+                document.getElementById('comparisonResult').classList.add('hidden');
+
                 // Start speech recognition
                 if (typeof startSpeechRecognition === 'function') {
                     startSpeechRecognition(sentences[currentIndex].en, (result) => {
-                        showAccuracy(result.accuracy);
+                        if (result.error) {
+                            showError(result.errorMessage || '음성 인식 오류가 발생했습니다.');
+                        } else {
+                            showAccuracy(result.accuracy, result.transcript);
+                        }
                         stopRecordingUI();
                     });
                 } else {
-                    // Fallback: simulate after 3 seconds
-                    setTimeout(() => {
-                        const fakeAccuracy = Math.floor(Math.random() * 30) + 70;
-                        showAccuracy(fakeAccuracy);
-                        stopRecordingUI();
-                    }, 3000);
+                    showError('음성인식 모듈을 불러올 수 없습니다.');
+                    stopRecordingUI();
                 }
             } else {
                 // Stop recording
@@ -167,21 +195,90 @@
 
         function stopRecordingUI() {
             const btn = document.getElementById('recordBtn');
+            const retryBtn = document.getElementById('retryBtn');
             const hint = document.getElementById('recordHint');
+
             isRecording = false;
             btn.classList.remove('recording');
             btn.innerHTML = '<i class="ti ti-microphone" style="font-size: 2rem;"></i>';
-            hint.textContent = '다시 시도하려면 버튼을 누르세요';
+
+            // Hide big button, show small retry button
+            btn.classList.add('hidden');
+            retryBtn.classList.remove('hidden');
+            retryBtn.style.display = 'flex';
+            hint.classList.add('hidden');
         }
 
-        function showAccuracy(accuracy) {
+        function showAccuracy(accuracy, transcript) {
             const display = document.getElementById('accuracyDisplay');
             const value = document.getElementById('accuracyValue');
             const circle = display.querySelector('.accuracy-circle');
+            const comparisonDiv = document.getElementById('comparisonResult');
 
             display.classList.remove('hidden');
             value.textContent = accuracy + '%';
             circle.style.setProperty('--accuracy', accuracy);
+
+            // Save accuracy to learningProgress
+            const progress = JSON.parse(sessionStorage.getItem('learningProgress') || '{"accuracyScores": []}');
+            progress.accuracyScores = progress.accuracyScores || [];
+            progress.accuracyScores.push(accuracy);
+            sessionStorage.setItem('learningProgress', JSON.stringify(progress));
+
+            // Show comparison with highlighted differences
+            if (transcript) {
+                const targetText = sentences[currentIndex].en;
+                const comparisonHtml = compareWords(targetText, transcript);
+                comparisonDiv.innerHTML = comparisonHtml;
+                comparisonDiv.classList.remove('hidden');
+            }
+        }
+
+        // Compare target and spoken words, highlight differences
+        function compareWords(target, spoken) {
+            const targetWords = target.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+            const spokenWords = spoken.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+            const originalTargetWords = target.replace(/[^\w\s]/g, '').split(/\s+/);
+            const originalSpokenWords = spoken.replace(/[^\w\s]/g, '').split(/\s+/);
+
+            // Build target line with highlights
+            let resultHtml = '<div><strong style="color: var(--text-gray);">정답:</strong> ';
+            for (let i = 0; i < originalTargetWords.length; i++) {
+                const word = originalTargetWords[i];
+                const wordLower = word.toLowerCase();
+
+                if (spokenWords.includes(wordLower)) {
+                    resultHtml += `<span style="color: #22C55E; font-weight: 600;">${word}</span> `;
+                } else {
+                    resultHtml += `<span style="color: #EF4444; font-weight: 600; text-decoration: underline;">${word}</span> `;
+                }
+            }
+            resultHtml += '</div>';
+
+            // Build spoken line with highlights (show extra words in orange)
+            resultHtml += '<div style="margin-top: 8px;"><strong style="color: var(--text-gray);">내 발음:</strong> ';
+            for (let i = 0; i < originalSpokenWords.length; i++) {
+                const word = originalSpokenWords[i];
+                const wordLower = word.toLowerCase();
+
+                if (targetWords.includes(wordLower)) {
+                    resultHtml += `<span style="color: #22C55E;">${word}</span> `;
+                } else {
+                    // Extra word not in target - show in orange with strikethrough
+                    resultHtml += `<span style="color: #F59E0B; text-decoration: line-through;">${word}</span> `;
+                }
+            }
+            resultHtml += '</div>';
+
+            return resultHtml;
+        }
+
+        function showError(message) {
+            const display = document.getElementById('accuracyDisplay');
+            const hint = document.getElementById('recordHint');
+
+            display.classList.add('hidden');
+            hint.innerHTML = '<span style="color: #e53935;">' + message + '</span>';
         }
 
         function prevSentence() {

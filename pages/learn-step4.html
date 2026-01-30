@@ -17,7 +17,7 @@
 </head>
 
 <body>
-    <div class="app-container" style="padding-bottom: 100px;">
+    <div class="app-container" style="padding-bottom: 120px;">
         <!-- Header -->
         <header class="app-header">
             <a href="learn-step3.html" class="back-btn">←</a>
@@ -62,19 +62,33 @@
             </div>
 
             <!-- Sentences Reference -->
-            <div class="card mt-2" style="max-height: 200px; overflow-y: auto;">
-                <p class="text-gray mb-1" style="font-size: 0.875rem;">읽을 문장들:</p>
-                <div id="sentenceList" style="font-size: 0.9rem;"></div>
+            <div class="card mt-2">
+                <!-- Toggle options for display -->
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <p class="text-gray" style="font-size: 0.875rem; margin: 0;">읽을 문장들:</p>
+                    <div style="display: flex; gap: 12px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--text-gray); cursor: pointer;">
+                            <input type="checkbox" id="showKorean" onchange="renderSentences()"
+                                style="width: 16px; height: 16px; accent-color: var(--primary);">
+                            <span>한글</span>
+                        </label>
+                        <label
+                            style="display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--text-gray); cursor: pointer;">
+                            <input type="checkbox" id="showEnglish" onchange="renderSentences()" checked
+                                style="width: 16px; height: 16px; accent-color: var(--primary);">
+                            <span>영어</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="sentenceList" style="font-size: 0.9rem; max-height: 180px; overflow-y: auto;"></div>
             </div>
 
             <!-- Recording Controls -->
             <div class="recording-controls" id="recordControls">
-                <button class="control-btn" onclick="retryRecording()" id="retryBtn" style="visibility: hidden;"><i
-                        class="ti ti-refresh"></i></button>
                 <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()"><i class="ti ti-video"
                         style="font-size: 2rem;"></i></button>
-                <button class="control-btn" onclick="saveRecording()" id="saveBtn" style="visibility: hidden;"><i
-                        class="ti ti-device-floppy"></i></button>
             </div>
             <p class="text-center text-gray" id="recordHint">버튼을 눌러 녹화 시작</p>
         </div>
@@ -82,7 +96,8 @@
         <!-- Action Buttons -->
         <div class="action-buttons hidden" id="actionButtons">
             <button class="btn btn-secondary" onclick="retryRecording()">다시 녹화</button>
-            <button class="btn btn-primary" onclick="completeLesson()">학습 완료 →</button>
+            <button class="btn btn-secondary" onclick="saveRecording()">녹화 저장</button>
+            <button class="btn btn-primary" onclick="completeLesson()">완료 →</button>
         </div>
     </div>
 
@@ -109,16 +124,34 @@
 
         function renderSentences() {
             const list = document.getElementById('sentenceList');
+            const showKorean = document.getElementById('showKorean').checked;
+            const showEnglish = document.getElementById('showEnglish').checked;
+
+            // If neither is checked, show at least English
+            const displayEnglish = showEnglish || (!showKorean && !showEnglish);
+            const displayKorean = showKorean;
+
             list.innerHTML = sentences.map((s, i) => `
                 <div style="padding: 8px 0; border-bottom: 1px solid var(--bg-gray);">
-                    <span style="color: var(--primary); font-weight: 600;">${i + 1}.</span>
-                    ${s.en}
+                    <div style="display: flex; align-items: flex-start; gap: 8px;">
+                        <span style="color: var(--primary); font-weight: 600; min-width: 24px;">${i + 1}.</span>
+                        <div>
+                            ${displayEnglish ? `<div style="font-weight: 500;">${s.en}</div>` : ''}
+                            ${displayKorean ? `<div style="color: var(--text-gray); font-size: 0.85rem;${displayEnglish ? ' margin-top: 4px;' : ''}">${s.kr}</div>` : ''}
+                        </div>
+                    </div>
                 </div>
             `).join('');
         }
 
         async function initCamera() {
             try {
+                // Stop any existing stream first
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }
+
                 cameraStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: true
@@ -134,23 +167,24 @@
             const btn = document.getElementById('recordBtn');
             const hint = document.getElementById('recordHint');
             const timer = document.getElementById('recordingTimer');
-            const retryBtn = document.getElementById('retryBtn');
-            const saveBtn = document.getElementById('saveBtn');
 
             if (!isRecording) {
                 // Start recording
                 try {
+                    // Ensure camera is ready
+                    if (!cameraStream) {
+                        await initCamera();
+                    }
+
                     await recorder.startCameraRecording((time) => {
                         timer.textContent = time;
                     });
 
                     isRecording = true;
                     btn.classList.add('recording');
-                    btn.textContent = '⏹️';
+                    btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
                     timer.classList.remove('hidden');
                     hint.textContent = '녹화 중... 버튼을 눌러 중지';
-                    retryBtn.style.visibility = 'hidden';
-                    saveBtn.style.visibility = 'hidden';
                 } catch (e) {
                     console.error('Recording error:', e);
                     showToast('녹화를 시작할 수 없습니다', 'error');
@@ -160,11 +194,17 @@
                 recordedBlob = await recorder.stopRecording();
                 isRecording = false;
                 btn.classList.remove('recording');
-                btn.textContent = '🎬';
+                btn.innerHTML = '<i class="ti ti-video" style="font-size: 2rem;"></i>';
                 timer.classList.add('hidden');
                 hint.textContent = '녹화 완료!';
 
                 if (recordedBlob) {
+                    // Stop camera to free resources
+                    if (cameraStream) {
+                        cameraStream.getTracks().forEach(track => track.stop());
+                        cameraStream = null;
+                    }
+
                     // Show preview
                     const url = URL.createObjectURL(recordedBlob);
                     document.getElementById('videoPreview').src = url;
@@ -172,23 +212,20 @@
                     document.getElementById('cameraSection').classList.add('hidden');
 
                     // Show action buttons
-                    retryBtn.style.visibility = 'visible';
-                    saveBtn.style.visibility = 'visible';
                     document.getElementById('actionButtons').classList.remove('hidden');
                 }
             }
         }
 
-        function retryRecording() {
+        async function retryRecording() {
             recordedBlob = null;
             document.getElementById('previewSection').classList.add('hidden');
             document.getElementById('cameraSection').classList.remove('hidden');
             document.getElementById('actionButtons').classList.add('hidden');
             document.getElementById('recordHint').textContent = '버튼을 눌러 녹화 시작';
-            document.getElementById('retryBtn').style.visibility = 'hidden';
-            document.getElementById('saveBtn').style.visibility = 'hidden';
+            document.getElementById('recordBtn').innerHTML = '<i class="ti ti-video" style="font-size: 2rem;"></i>';
 
-            initCamera();
+            await initCamera();
         }
 
         async function saveRecording() {
@@ -199,7 +236,12 @@
             try {
                 const student = JSON.parse(sessionStorage.getItem('currentStudent'));
                 const studentId = student?.id || 'demo';
-                const { data: videoUrl, error } = await uploadVideo(recordedBlob, studentId);
+                const studentName = student?.name || 'student';
+
+                // Get unit info from sessionStorage
+                const unitTitle = sessionStorage.getItem('currentUnitTitle') || 'Unit';
+
+                const { data: videoUrl, error } = await uploadVideo(recordedBlob, studentId, studentName, unitTitle);
 
                 if (error) {
                     hideLoading();

@@ -53,6 +53,53 @@ async function getSupabase() {
 }
 
 // ============================================
+// Security & Input Validation
+// ============================================
+
+// Sanitize user input - removes XSS attack vectors
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return input;
+    return input
+        .trim()
+        .replace(/[<>'"&]/g, '') // Remove dangerous characters
+        .slice(0, 100); // Limit length
+}
+
+// Sanitize for HTML display - escapes HTML entities
+function sanitizeHtml(text) {
+    if (typeof text !== 'string') return text;
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Enhanced error handler with user-friendly messages
+function handleError(error, context = '') {
+    console.error(`❌ Error${context ? ` in ${context}` : ''}:`, error);
+
+    // Map technical errors to user-friendly messages
+    const errorMessages = {
+        'Failed to fetch': '네트워크 연결을 확인해주세요',
+        'PGRST116': '데이터를 찾을 수 없습니다',
+        'PGRST301': '권한이 없습니다. 다시 로그인해주세요',
+        '23505': '이미 등록된 정보입니다',
+        '42501': '접근 권한이 없습니다',
+        'NetworkError': '인터넷 연결을 확인해주세요',
+        'TypeError': '잘못된 데이터 형식입니다'
+    };
+
+    const errorStr = error?.message || error?.code || String(error);
+
+    for (const [key, msg] of Object.entries(errorMessages)) {
+        if (errorStr.includes(key)) {
+            return msg;
+        }
+    }
+
+    return '오류가 발생했습니다. 다시 시도해주세요';
+}
+
+// ============================================
 // Student Functions
 // ============================================
 
@@ -88,13 +135,25 @@ async function createStudent(name, grade) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
+    // Sanitize inputs
+    const safeName = sanitizeInput(name);
+    const safeGrade = sanitizeInput(grade);
+
+    if (!safeName || safeName.length < 1) {
+        return { data: null, error: '이름을 입력해주세요' };
+    }
+
     const { data, error } = await client
         .from('students')
-        .insert([{ name, grade }])
+        .insert([{ name: safeName, grade: safeGrade }])
         .select()
         .single();
 
-    return { data, error };
+    if (error) {
+        return { data: null, error: handleError(error, 'createStudent') };
+    }
+
+    return { data, error: null };
 }
 
 // Find student by name and grade
@@ -102,11 +161,15 @@ async function findStudent(name, grade) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
+    // Sanitize inputs
+    const safeName = sanitizeInput(name);
+    const safeGrade = sanitizeInput(grade);
+
     const { data, error } = await client
         .from('students')
         .select('*')
-        .eq('name', name)
-        .eq('grade', grade)
+        .eq('name', safeName)
+        .eq('grade', safeGrade)
         .single();
 
     return { data, error };
@@ -344,12 +407,53 @@ async function updateRecordingFeedback(recordingId, feedback, stickerCount) {
 // Storage Functions
 // ============================================
 
+// Korean to Romanization converter
+function koreanToRoman(korean) {
+    const initials = ['g', 'kk', 'n', 'd', 'tt', 'r', 'm', 'b', 'pp', 's', 'ss', '', 'j', 'jj', 'ch', 'k', 't', 'p', 'h'];
+    const medials = ['a', 'ae', 'ya', 'yae', 'eo', 'e', 'yeo', 'ye', 'o', 'wa', 'wae', 'oe', 'yo', 'u', 'wo', 'we', 'wi', 'yu', 'eu', 'ui', 'i'];
+    const finals = ['', 'k', 'k', 'k', 'n', 'n', 'n', 't', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'm', 'p', 'p', 's', 's', 'ng', 't', 't', 't', 't', 't', 'p', 't'];
+
+    let result = '';
+
+    for (let i = 0; i < korean.length; i++) {
+        const code = korean.charCodeAt(i);
+
+        // Check if it's a Korean syllable (가-힣: 0xAC00-0xD7A3)
+        if (code >= 0xAC00 && code <= 0xD7A3) {
+            const syllableIndex = code - 0xAC00;
+            const initialIndex = Math.floor(syllableIndex / 588);
+            const medialIndex = Math.floor((syllableIndex % 588) / 28);
+            const finalIndex = syllableIndex % 28;
+
+            result += initials[initialIndex] + medials[medialIndex] + finals[finalIndex];
+        } else if (/[a-zA-Z0-9]/.test(korean[i])) {
+            result += korean[i];
+        }
+    }
+
+    // Capitalize first letter of each word part
+    return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
 // Upload video to Supabase Storage
-async function uploadVideo(file, studentId) {
+async function uploadVideo(file, studentId, studentName = '', unitTitle = '') {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
-    const fileName = `${studentId}/${Date.now()}.webm`;
+    // Create filename: EnglishName_Unit_date.webm
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+
+    // Convert Korean name to Romanized English
+    const englishName = koreanToRoman(studentName) || 'Student';
+
+    // Extract unit number if possible (e.g., "Unit 1" -> "U1")
+    const unitMatch = unitTitle.match(/\d+/);
+    const unitNum = unitMatch ? `U${unitMatch[0]}` : 'Rec';
+
+    const fileName = `${studentId}/${englishName}_${unitNum}_${dateStr}.webm`;
+
+    console.log('📹 Upload:', { studentName, englishName, unitNum, fileName });
 
     const { data, error } = await client
         .storage

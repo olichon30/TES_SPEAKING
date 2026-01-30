@@ -66,28 +66,51 @@
                 return;
             }
 
-            // Create temp student object (level will be set in onboarding)
-            const student = {
-                id: Date.now().toString(),
-                name: name,
-                grade: null // Will be set during onboarding
-            };
+            showLoading('로그인 중...');
 
-            sessionStorage.setItem('currentStudent', JSON.stringify(student));
+            try {
+                // Check if onboarding is completed (to get grade)
+                const onboardingComplete = localStorage.getItem('onboardingComplete_' + name);
+                const savedLevel = localStorage.getItem('studentLevel_' + name) || '초등 3학년';
 
-            // Check if onboarding is completed
-            const onboardingComplete = localStorage.getItem('onboardingComplete_' + name);
+                // Try to find or create student in Supabase
+                let { data: student, error } = await findStudent(name, savedLevel);
+                console.log('🔍 Find student:', { student, error });
 
-            if (onboardingComplete) {
-                // Returning user - load saved level
-                const savedLevel = localStorage.getItem('studentLevel_' + name);
-                if (savedLevel) {
-                    student.grade = savedLevel;
-                    sessionStorage.setItem('currentStudent', JSON.stringify(student));
+                if (!student) {
+                    // Create new student
+                    console.log('📝 Creating student...');
+                    const result = await createStudent(name, savedLevel);
+                    student = result.data;
+                    error = result.error;
+                    console.log('📝 Create result:', { student, error });
                 }
-                window.location.href = 'pages/main.html';
-            } else {
-                // New user - go to onboarding
+
+                if (error || !student) {
+                    console.warn('⚠️ Supabase error, using local fallback');
+                    // Fallback to local ID
+                    student = {
+                        id: Date.now().toString(),
+                        name: name,
+                        grade: savedLevel
+                    };
+                }
+
+                hideLoading();
+                console.log('✅ Final student:', student);
+                sessionStorage.setItem('currentStudent', JSON.stringify(student));
+
+                if (onboardingComplete) {
+                    window.location.href = 'pages/main.html';
+                } else {
+                    window.location.href = 'pages/onboarding.html';
+                }
+            } catch (err) {
+                console.error('❌ Login error:', err);
+                hideLoading();
+                // Fallback
+                const student = { id: Date.now().toString(), name: name, grade: null };
+                sessionStorage.setItem('currentStudent', JSON.stringify(student));
                 window.location.href = 'pages/onboarding.html';
             }
         });

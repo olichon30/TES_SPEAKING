@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교재 관리 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: var(--primary-pale);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+
+        .upload-text {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+
+        .textbook-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .textbook-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .textbook-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: var(--primary-pale);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .textbook-info {
+            flex: 1;
+        }
+
+        .textbook-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .textbook-meta {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+
+        .textbook-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            background: var(--bg-light);
+            color: var(--text-gray);
+        }
+
+        .action-btn:hover {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .action-btn.delete:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .preview-section {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .preview-section.show {
+            display: block;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-table th {
+            background: var(--bg-light);
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-dark);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <a href="dashboard.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title">교재 관리</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <div class="content-area" style="padding-bottom: 20px;">
+            <!-- Upload Area -->
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                <div class="upload-icon"><i class="ti ti-file-upload"></i></div>
+                <p class="upload-text">Excel 파일을 드래그하거나 클릭하여 업로드</p>
+                <p class="upload-text" style="font-size: 0.8rem; color: var(--text-light);">
+                    형식: Unit | 영어 문장 | 한국어 문장
+                </p>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="preview-section" id="previewSection">
+                <div class="preview-header">
+                    <h3 class="section-title" id="previewTitle">미리보기</h3>
+                    <button class="btn btn-primary" onclick="uploadData()">
+                        <i class="ti ti-upload"></i> 업로드
+                    </button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="preview-table" id="previewTable">
+                        <thead>
+                            <tr>
+                                <th>Unit</th>
+                                <th>영어</th>
+                                <th>한국어</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Existing Textbooks -->
+            <h3 class="section-title">등록된 교재</h3>
+            <div class="textbook-list" id="textbookList">
+                <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>교재 불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let parsedData = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTextbooks();
+            setupFileUpload();
+        });
+
+        function setupFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            // Drag and drop
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) processFile(file);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) processFile(file);
+            });
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    // Parse data (skip header row)
+                    parsedData = {
+                        name: file.name.replace(/\.[^/.]+$/, ''),
+                        units: {}
+                    };
+
+                    for (let i = 1; i < data.length; i++) {
+                        const row = data[i];
+                        if (row.length >= 3) {
+                            const unit = row[0]?.toString() || 'Unit 1';
+                            const en = row[1]?.toString() || '';
+                            const kr = row[2]?.toString() || '';
+
+                            if (!parsedData.units[unit]) {
+                                parsedData.units[unit] = [];
+                            }
+                            parsedData.units[unit].push({ en, kr });
+                        }
+                    }
+
+                    showPreview();
+                } catch (err) {
+                    console.error('Parse error:', err);
+                    showToast('파일 파싱 실패', 'error');
+                }
+            };
+
+            reader.readAsBinaryString(file);
+        }
+
+        function showPreview() {
+            if (!parsedData) return;
+
+            document.getElementById('previewTitle').textContent = `미리보기: ${parsedData.name}`;
+
+            let html = '';
+            for (const unit in parsedData.units) {
+                for (const sentence of parsedData.units[unit]) {
+                    html += `
+                        <tr>
+                            <td>${unit}</td>
+                            <td>${sentence.en}</td>
+                            <td>${sentence.kr}</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            document.getElementById('previewBody').innerHTML = html;
+            document.getElementById('previewSection').classList.add('show');
+        }
+
+        async function uploadData() {
+            if (!parsedData) return;
+
+            showLoading('교재 업로드 중...');
+
+            try {
+                const result = await importTextbookData(parsedData);
+
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                hideLoading();
+                showToast('교재가 업로드되었습니다', 'success');
+
+                parsedData = null;
+                document.getElementById('previewSection').classList.remove('show');
+                document.getElementById('fileInput').value = '';
+
+                await loadTextbooks();
+            } catch (err) {
+                console.error('Upload error:', err);
+                hideLoading();
+                showToast('업로드 실패: ' + err.message, 'error');
+            }
+        }
+
+        async function loadTextbooks() {
+            try {
+                const { data: textbooks, error } = await getTextbooks();
+
+                if (error) {
+                    console.error('Load textbooks error:', error);
+                }
+
+                const list = document.getElementById('textbookList');
+
+                if (!textbooks || textbooks.length === 0) {
+                    list.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                            <i class="ti ti-books" style="font-size: 3rem; color: var(--text-light);"></i>
+                            <p>등록된 교재가 없습니다</p>
+                            <p style="font-size: 0.85rem;">위에서 Excel 파일을 업로드하세요</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = textbooks.map(tb => `
+                    <div class="textbook-card">
+                        <div class="textbook-icon">${tb.icon || '📚'}</div>
+                        <div class="textbook-info">
+                            <div class="textbook-name">${tb.name}</div>
+                            <div class="textbook-meta">${tb.grade || ''}</div>
+                        </div>
+                        <div class="textbook-actions">
+                            <button class="action-btn" onclick="viewTextbook('${tb.id}')" title="보기">
+                                <i class="ti ti-eye"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteTextbook('${tb.id}')" title="삭제">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                console.error('Load error:', err);
+            }
+        }
+
+        async function deleteTextbook(id) {
+            if (!confirm('이 교재를 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client.from('textbooks').delete().eq('id', id);
+
+                if (error) throw error;
+
+                showToast('삭제되었습니다', 'success');
+                await loadTextbooks();
+            } catch (err) {
+                showToast('삭제 실패', 'error');
+            }
+        }
+
+        function viewTextbook(id) {
+            // TODO: Navigate to textbook details
+            showToast('교재 상세 보기 (준비 중)', 'info');
+        }
+    </script>
+</body>
+
+</html>
