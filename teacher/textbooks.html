@@ -200,6 +200,113 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">교재 편집</h3>
+                <button class="close-btn" onclick="hideEditModal()">&times;</button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editTextbookId">
+                <div class="form-group">
+                    <label class="form-label">교재 이름</label>
+                    <input type="text" id="editTextbookName" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">폴더 (선택)</label>
+                    <input type="text" id="editTextbookFolder" class="form-input" placeholder="예: 초등, 중등, 고등">
+                    <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="folder-tag" onclick="setFolder('초등')">초등</button>
+                        <button type="button" class="folder-tag" onclick="setFolder('중등')">중등</button>
+                        <button type="button" class="folder-tag" onclick="setFolder('고등')">고등</button>
+                        <button type="button" class="folder-tag" onclick="setFolder('')">없음</button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-gray);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+
+        .folder-tag {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--bg-light);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .folder-tag:hover {
+            background: var(--primary-pale);
+            border-color: var(--primary);
+        }
+    </style>
+
     <script src="../js/supabase.js"></script>
     <script>
         let parsedData = null;
@@ -242,29 +349,42 @@
             reader.onload = (e) => {
                 try {
                     const workbook = XLSX.read(e.target.result, { type: 'binary' });
-                    const sheetName = workbook.SheetNames[0];
-                    const sheet = workbook.Sheets[sheetName];
-                    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-                    // Parse data (skip header row)
+                    // 교재 이름 = 파일명 (확장자 제외)
                     parsedData = {
                         name: file.name.replace(/\.[^/.]+$/, ''),
                         units: {}
                     };
 
-                    for (let i = 1; i < data.length; i++) {
-                        const row = data[i];
-                        if (row.length >= 3) {
-                            const unit = row[0]?.toString() || 'Unit 1';
-                            const en = row[1]?.toString() || '';
-                            const kr = row[2]?.toString() || '';
+                    // 모든 시트 순회 - 각 시트가 하나의 Unit
+                    workbook.SheetNames.forEach((sheetName) => {
+                        const sheet = workbook.Sheets[sheetName];
+                        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-                            if (!parsedData.units[unit]) {
-                                parsedData.units[unit] = [];
+                        // 시트 이름이 Unit 이름
+                        const unitName = sheetName;
+                        parsedData.units[unitName] = [];
+
+                        // 첫 행은 헤더로 건너뜀 (i = 1부터 시작)
+                        for (let i = 1; i < data.length; i++) {
+                            const row = data[i];
+                            // A열: 영어, B열: 한국어 (또는 A열만 있을 수 있음)
+                            if (row.length >= 1 && row[0]) {
+                                const en = row[0]?.toString().trim() || '';
+                                const kr = row[1]?.toString().trim() || '';
+
+                                if (en) {
+                                    parsedData.units[unitName].push({ en, kr });
+                                }
                             }
-                            parsedData.units[unit].push({ en, kr });
                         }
-                    }
+                    });
+
+                    console.log('📊 Parsed Excel:', {
+                        name: parsedData.name,
+                        unitCount: Object.keys(parsedData.units).length,
+                        units: Object.keys(parsedData.units)
+                    });
 
                     showPreview();
                 } catch (err) {
@@ -346,16 +466,27 @@
                     return;
                 }
 
-                list.innerHTML = textbooks.map(tb => `
-                    <div class="textbook-card">
+                list.innerHTML = textbooks.map((tb, idx) => `
+                    <div class="textbook-card" data-folder="${tb.folder || ''}" data-id="${tb.id}">
+                        <div style="display: flex; flex-direction: column; gap: 2px; margin-right: 8px;">
+                            <button class="action-btn" onclick="moveTextbook('${tb.id}', -1)" ${idx === 0 ? 'disabled' : ''} title="위로">
+                                <i class="ti ti-chevron-up"></i>
+                            </button>
+                            <button class="action-btn" onclick="moveTextbook('${tb.id}', 1)" ${idx === textbooks.length - 1 ? 'disabled' : ''} title="아래로">
+                                <i class="ti ti-chevron-down"></i>
+                            </button>
+                        </div>
                         <div class="textbook-icon">${tb.icon || '📚'}</div>
                         <div class="textbook-info">
-                            <div class="textbook-name">${tb.name}</div>
-                            <div class="textbook-meta">${tb.grade || ''}</div>
+                            <div class="textbook-name">${escapeHtml(tb.name)}</div>
+                            <div class="textbook-meta">${tb.folder ? '📁 ' + tb.folder : ''} ${tb.grade || ''}</div>
                         </div>
                         <div class="textbook-actions">
-                            <button class="action-btn" onclick="viewTextbook('${tb.id}')" title="보기">
+                            <button class="action-btn" onclick="viewTextbook('${tb.id}')" title="내용 보기/편집">
                                 <i class="ti ti-eye"></i>
+                            </button>
+                            <button class="action-btn" onclick="editTextbook('${tb.id}', '${escapeHtml(tb.name)}', '${tb.folder || ''}')" title="이름/폴더 편집">
+                                <i class="ti ti-edit"></i>
                             </button>
                             <button class="action-btn delete" onclick="deleteTextbook('${tb.id}')" title="삭제">
                                 <i class="ti ti-trash"></i>
@@ -386,8 +517,98 @@
         }
 
         function viewTextbook(id) {
-            // TODO: Navigate to textbook details
-            showToast('교재 상세 보기 (준비 중)', 'info');
+            // Navigate to textbook detail page
+            window.location.href = `textbook-detail.html?id=${id}`;
+        }
+
+        // ===== Edit Functions =====
+        function editTextbook(id, name, folder) {
+            document.getElementById('editTextbookId').value = id;
+            document.getElementById('editTextbookName').value = name;
+            document.getElementById('editTextbookFolder').value = folder || '';
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+
+        function setFolder(folderName) {
+            document.getElementById('editTextbookFolder').value = folderName;
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('editTextbookId').value;
+            const name = document.getElementById('editTextbookName').value.trim();
+            const folder = document.getElementById('editTextbookFolder').value.trim();
+
+            if (!name) {
+                showToast('교재 이름을 입력하세요', 'error');
+                return;
+            }
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client
+                    .from('textbooks')
+                    .update({ name, folder })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast('저장되었습니다', 'success');
+                hideEditModal();
+                await loadTextbooks();
+            } catch (err) {
+                console.error('Save error:', err);
+                showToast('저장 실패: ' + err.message, 'error');
+            }
+        });
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Move textbook order
+        let allTextbooks = [];
+        async function moveTextbook(id, direction) {
+            try {
+                const client = await getSupabase();
+
+                // Get all textbooks to find current positions
+                const { data: textbooks } = await client
+                    .from('textbooks')
+                    .select('*')
+                    .order('created_at', { ascending: true });
+
+                const idx = textbooks.findIndex(t => t.id === id);
+                const newIdx = idx + direction;
+
+                if (newIdx < 0 || newIdx >= textbooks.length) return;
+
+                // Swap created_at timestamps to change order (simple approach)
+                const currentTb = textbooks[idx];
+                const swapTb = textbooks[newIdx];
+
+                // Update using a temporary swap technique
+                const tempTime = currentTb.created_at;
+                await client.from('textbooks').update({ created_at: swapTb.created_at }).eq('id', currentTb.id);
+                await client.from('textbooks').update({ created_at: tempTime }).eq('id', swapTb.id);
+
+                await loadTextbooks();
+            } catch (err) {
+                console.error('Move error:', err);
+                showToast('순서 변경 실패', 'error');
+            }
         }
     </script>
 </body>

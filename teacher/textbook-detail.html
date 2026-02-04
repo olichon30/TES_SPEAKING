@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교재 상세 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        .unit-card {
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .unit-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            background: var(--primary-pale);
+        }
+
+        .unit-header:hover {
+            background: #e0e7ff;
+        }
+
+        .unit-title {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .unit-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            background: white;
+            color: var(--text-gray);
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .sentence-list {
+            padding: 0 16px 16px;
+            display: none;
+        }
+
+        .sentence-list.show {
+            display: block;
+        }
+
+        .sentence-item {
+            padding: 12px;
+            background: var(--bg-light);
+            border-radius: var(--radius-md);
+            margin-bottom: 8px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .sentence-content {
+            flex: 1;
+        }
+
+        .sentence-en {
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .sentence-kr {
+            font-size: 0.875rem;
+            color: var(--text-gray);
+            margin-top: 4px;
+        }
+
+        .sentence-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-gray);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .add-btn {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .order-arrows {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .order-btn {
+            padding: 4px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .order-btn:hover {
+            background: var(--primary-pale);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <a href="textbooks.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+            <h1 class="header-title" id="textbookTitle">교재 상세</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <div class="content-area" style="padding-bottom: 100px;">
+            <div id="unitList">
+                <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                    <i class="ti ti-loader" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+                    <p>불러오는 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Unit Button -->
+        <button class="add-btn" onclick="showAddUnitModal()" title="유닛 추가">
+            <i class="ti ti-plus"></i>
+        </button>
+    </div>
+
+    <!-- Edit Unit Modal -->
+    <div class="modal" id="unitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="unitModalTitle">유닛 편집</h3>
+                <button class="close-btn" onclick="hideModal('unitModal')">&times;</button>
+            </div>
+            <form id="unitForm">
+                <input type="hidden" id="editUnitId">
+                <div class="form-group">
+                    <label class="form-label">유닛 이름</label>
+                    <input type="text" id="editUnitName" class="form-input" required placeholder="예: Unit 1. Family">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Sentence Modal -->
+    <div class="modal" id="sentenceModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="sentenceModalTitle">문장 편집</h3>
+                <button class="close-btn" onclick="hideModal('sentenceModal')">&times;</button>
+            </div>
+            <form id="sentenceForm">
+                <input type="hidden" id="editSentenceId">
+                <input type="hidden" id="editSentenceUnitId">
+                <div class="form-group">
+                    <label class="form-label">영어 문장</label>
+                    <textarea id="editSentenceEn" class="form-textarea" required
+                        placeholder="Hello, how are you?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">한국어 뜻</label>
+                    <textarea id="editSentenceKr" class="form-textarea" placeholder="안녕, 어떻게 지내?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let textbookId = null;
+        let textbookData = null;
+        let unitsData = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            textbookId = params.get('id');
+
+            if (!textbookId) {
+                window.location.href = 'textbooks.html';
+                return;
+            }
+
+            await loadTextbookDetails();
+        });
+
+        async function loadTextbookDetails() {
+            try {
+                const client = await getSupabase();
+
+                // Get textbook
+                const { data: textbook } = await client
+                    .from('textbooks')
+                    .select('*')
+                    .eq('id', textbookId)
+                    .single();
+
+                if (!textbook) {
+                    showToast('교재를 찾을 수 없습니다', 'error');
+                    return;
+                }
+
+                textbookData = textbook;
+                document.getElementById('textbookTitle').textContent = textbook.name;
+
+                // Get units with sentences
+                const { data: units } = await client
+                    .from('units')
+                    .select('*')
+                    .eq('textbook_id', textbookId)
+                    .order('order_num', { ascending: true });
+
+                unitsData = units || [];
+
+                // Get sentences for each unit
+                for (let unit of unitsData) {
+                    const { data: sentences } = await client
+                        .from('sentences')
+                        .select('*')
+                        .eq('unit_id', unit.id)
+                        .order('order_num', { ascending: true });
+                    unit.sentences = sentences || [];
+                }
+
+                renderUnits();
+            } catch (err) {
+                console.error('Load error:', err);
+                showToast('로드 실패', 'error');
+            }
+        }
+
+        function renderUnits() {
+            const list = document.getElementById('unitList');
+
+            if (unitsData.length === 0) {
+                list.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                        <i class="ti ti-folder-off" style="font-size: 3rem;"></i>
+                        <p>유닛이 없습니다</p>
+                        <p style="font-size: 0.85rem;">+ 버튼을 눌러 유닛을 추가하세요</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = unitsData.map((unit, idx) => `
+                <div class="unit-card" data-unit-id="${unit.id}">
+                    <div class="unit-header" onclick="toggleSentences('${unit.id}')">
+                        <div class="order-arrows" onclick="event.stopPropagation()">
+                            <button class="order-btn" onclick="moveUnit('${unit.id}', -1)" ${idx === 0 ? 'disabled' : ''}>
+                                <i class="ti ti-chevron-up"></i>
+                            </button>
+                            <button class="order-btn" onclick="moveUnit('${unit.id}', 1)" ${idx === unitsData.length - 1 ? 'disabled' : ''}>
+                                <i class="ti ti-chevron-down"></i>
+                            </button>
+                        </div>
+                        <span class="unit-title">${unit.name} <span style="font-weight: normal; color: var(--text-gray);">(${unit.sentences?.length || 0}문장)</span></span>
+                        <div class="unit-actions" onclick="event.stopPropagation()">
+                            <button class="action-btn" onclick="showEditUnitModal('${unit.id}', '${unit.name}')" title="이름 편집">
+                                <i class="ti ti-edit"></i>
+                            </button>
+                            <button class="action-btn" onclick="showAddSentenceModal('${unit.id}')" title="문장 추가">
+                                <i class="ti ti-plus"></i>
+                            </button>
+                            <button class="action-btn" onclick="deleteUnit('${unit.id}')" title="삭제" style="color: #DC2626;">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sentence-list" id="sentences-${unit.id}">
+                        ${renderSentences(unit.sentences || [], unit.id)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSentences(sentences, unitId) {
+            if (sentences.length === 0) {
+                return '<p style="color: var(--text-gray); text-align: center; padding: 20px;">문장이 없습니다</p>';
+            }
+            return sentences.map(s => `
+                <div class="sentence-item">
+                    <div class="sentence-content">
+                        <div class="sentence-en">${s.sentence_en}</div>
+                        <div class="sentence-kr">${s.sentence_kr || ''}</div>
+                    </div>
+                    <div class="sentence-actions">
+                        <button class="action-btn" onclick="showEditSentenceModal('${s.id}', '${unitId}')" title="편집">
+                            <i class="ti ti-edit"></i>
+                        </button>
+                        <button class="action-btn" onclick="deleteSentence('${s.id}')" title="삭제" style="color: #DC2626;">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleSentences(unitId) {
+            const el = document.getElementById('sentences-' + unitId);
+            el.classList.toggle('show');
+        }
+
+        // ===== Unit Functions =====
+        function showAddUnitModal() {
+            document.getElementById('unitModalTitle').textContent = '유닛 추가';
+            document.getElementById('editUnitId').value = '';
+            document.getElementById('editUnitName').value = '';
+            document.getElementById('unitModal').classList.add('show');
+        }
+
+        function showEditUnitModal(id, name) {
+            document.getElementById('unitModalTitle').textContent = '유닛 편집';
+            document.getElementById('editUnitId').value = id;
+            document.getElementById('editUnitName').value = name;
+            document.getElementById('unitModal').classList.add('show');
+        }
+
+        document.getElementById('unitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editUnitId').value;
+            const name = document.getElementById('editUnitName').value.trim();
+
+            try {
+                const client = await getSupabase();
+
+                if (id) {
+                    // Update
+                    await client.from('units').update({ name }).eq('id', id);
+                } else {
+                    // Insert
+                    const orderNum = unitsData.length + 1;
+                    await client.from('units').insert([{
+                        textbook_id: textbookId,
+                        name,
+                        order_num: orderNum
+                    }]);
+                }
+
+                showToast('저장되었습니다', 'success');
+                hideModal('unitModal');
+                await loadTextbookDetails();
+            } catch (err) {
+                showToast('저장 실패', 'error');
+            }
+        });
+
+        async function deleteUnit(id) {
+            if (!confirm('이 유닛과 모든 문장을 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                await client.from('units').delete().eq('id', id);
+                showToast('삭제되었습니다', 'success');
+                await loadTextbookDetails();
+            } catch (err) {
+                showToast('삭제 실패', 'error');
+            }
+        }
+
+        async function moveUnit(unitId, direction) {
+            const idx = unitsData.findIndex(u => u.id === unitId);
+            const newIdx = idx + direction;
+
+            if (newIdx < 0 || newIdx >= unitsData.length) return;
+
+            try {
+                const client = await getSupabase();
+                const currentUnit = unitsData[idx];
+                const swapUnit = unitsData[newIdx];
+
+                // Swap order_num
+                await client.from('units').update({ order_num: newIdx + 1 }).eq('id', currentUnit.id);
+                await client.from('units').update({ order_num: idx + 1 }).eq('id', swapUnit.id);
+
+                await loadTextbookDetails();
+            } catch (err) {
+                showToast('순서 변경 실패', 'error');
+            }
+        }
+
+        // ===== Sentence Functions =====
+        function showAddSentenceModal(unitId) {
+            document.getElementById('sentenceModalTitle').textContent = '문장 추가';
+            document.getElementById('editSentenceId').value = '';
+            document.getElementById('editSentenceUnitId').value = unitId;
+            document.getElementById('editSentenceEn').value = '';
+            document.getElementById('editSentenceKr').value = '';
+            document.getElementById('sentenceModal').classList.add('show');
+        }
+
+        function showEditSentenceModal(sentenceId, unitId) {
+            const unit = unitsData.find(u => u.id === unitId);
+            const sentence = unit?.sentences?.find(s => s.id === sentenceId);
+            if (!sentence) return;
+
+            document.getElementById('sentenceModalTitle').textContent = '문장 편집';
+            document.getElementById('editSentenceId').value = sentenceId;
+            document.getElementById('editSentenceUnitId').value = unitId;
+            document.getElementById('editSentenceEn').value = sentence.sentence_en || '';
+            document.getElementById('editSentenceKr').value = sentence.sentence_kr || '';
+            document.getElementById('sentenceModal').classList.add('show');
+        }
+
+        document.getElementById('sentenceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editSentenceId').value;
+            const unitId = document.getElementById('editSentenceUnitId').value;
+            const sentence_en = document.getElementById('editSentenceEn').value.trim();
+            const sentence_kr = document.getElementById('editSentenceKr').value.trim();
+
+            try {
+                const client = await getSupabase();
+
+                if (id) {
+                    // Update
+                    await client.from('sentences').update({ sentence_en, sentence_kr }).eq('id', id);
+                } else {
+                    // Insert
+                    const unit = unitsData.find(u => u.id === unitId);
+                    const orderNum = (unit?.sentences?.length || 0) + 1;
+                    await client.from('sentences').insert([{
+                        unit_id: unitId,
+                        sentence_en,
+                        sentence_kr,
+                        order_num: orderNum
+                    }]);
+                }
+
+                showToast('저장되었습니다', 'success');
+                hideModal('sentenceModal');
+                await loadTextbookDetails();
+            } catch (err) {
+                console.error('Save error:', err);
+                showToast('저장 실패', 'error');
+            }
+        });
+
+        async function deleteSentence(id) {
+            if (!confirm('이 문장을 삭제하시겠습니까?')) return;
+
+            try {
+                const client = await getSupabase();
+                await client.from('sentences').delete().eq('id', id);
+                showToast('삭제되었습니다', 'success');
+                await loadTextbookDetails();
+            } catch (err) {
+                showToast('삭제 실패', 'error');
+            }
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+    </script>
+</body>
+
+</html>

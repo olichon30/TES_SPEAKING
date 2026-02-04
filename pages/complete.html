@@ -124,6 +124,19 @@
                 todayData.sentences += sentences.length;
                 todayData.sessions += 1;
                 localStorage.setItem(completionKey, JSON.stringify(todayData));
+
+                // Save last learning info for "Continue Learning" feature
+                const currentUnit = JSON.parse(sessionStorage.getItem('currentUnit') || 'null');
+                const currentTextbook = JSON.parse(sessionStorage.getItem('currentTextbook') || 'null');
+
+                const lastLearning = {
+                    unitTitle: currentUnit?.title || '학습',
+                    unitId: currentUnit?.id || null,
+                    textbookName: currentTextbook?.name || null,
+                    textbookId: currentTextbook?.id || null,
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('lastLearning_' + student.name, JSON.stringify(lastLearning));
             }
         });
 

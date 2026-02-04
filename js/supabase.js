@@ -156,21 +156,30 @@ async function createStudent(name, grade) {
     return { data, error: null };
 }
 
-// Find student by name and grade
-async function findStudent(name, grade) {
+// Find student by name (grade is optional, for updating)
+async function findStudent(name, grade = null) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
     // Sanitize inputs
     const safeName = sanitizeInput(name);
-    const safeGrade = sanitizeInput(grade);
 
+    // Search by name only (not name + grade)
     const { data, error } = await client
         .from('students')
         .select('*')
         .eq('name', safeName)
-        .eq('grade', safeGrade)
         .single();
+
+    // If found and grade provided, optionally update grade
+    if (data && grade && data.grade !== grade) {
+        const safeGrade = sanitizeInput(grade);
+        await client
+            .from('students')
+            .update({ grade: safeGrade })
+            .eq('id', data.id);
+        data.grade = safeGrade;
+    }
 
     return { data, error };
 }
@@ -193,15 +202,24 @@ async function getTextbooks() {
 }
 
 // Create textbook
-async function createTextbook(name, grade = null, icon = '📚') {
+async function createTextbook(name, grade = null, icon = null) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
+    // Build insert object with only non-null values
+    const insertData = { name };
+    if (grade) insertData.grade = grade;
+    if (icon) insertData.icon = icon;
+
     const { data, error } = await client
         .from('textbooks')
-        .insert([{ name, grade, icon }])
+        .insert([insertData])
         .select()
         .single();
+
+    if (error) {
+        console.error('Create textbook error:', error);
+    }
 
     return { data, error };
 }
@@ -293,29 +311,59 @@ async function importTextbookData(parsedData) {
     if (!client) return { success: false, error: 'Supabase not initialized' };
 
     try {
+        // Get textbook name (support both 'name' and 'textbookName')
+        const textbookName = parsedData.name || parsedData.textbookName;
+        if (!textbookName) {
+            throw new Error('교재 이름이 없습니다');
+        }
+
         // 1. Create textbook
-        const { data: textbook, error: textbookError } = await createTextbook(parsedData.textbookName);
+        const { data: textbook, error: textbookError } = await createTextbook(textbookName);
         if (textbookError) throw textbookError;
 
-        // 2. Create units and sentences
-        for (let i = 0; i < parsedData.units.length; i++) {
-            const unitData = parsedData.units[i];
+        // 2. Handle units (can be object or array)
+        const units = parsedData.units;
+        console.log('📦 Units data:', typeof units, Array.isArray(units) ? `Array(${units.length})` : Object.keys(units || {}).length + ' keys');
+        console.log('📦 Units sample:', JSON.stringify(units).slice(0, 200));
 
-            // Create unit
-            const { data: unit, error: unitError } = await createUnit(textbook.id, unitData.name, i + 1);
-            if (unitError) throw unitError;
+        if (Array.isArray(units)) {
+            // Array format: [{name, sentences: []}]
+            for (let i = 0; i < units.length; i++) {
+                const unitData = units[i];
+                const { data: unit, error: unitError } = await createUnit(textbook.id, unitData.name, i + 1);
+                if (unitError) throw unitError;
 
-            // Create sentences for this unit
-            if (unitData.sentences && unitData.sentences.length > 0) {
-                const sentencesToInsert = unitData.sentences.map((s, idx) => ({
-                    unit_id: unit.id,
-                    sentence_en: s.en,
-                    sentence_kr: s.kr || '',
-                    order_num: idx + 1
-                }));
+                if (unitData.sentences && unitData.sentences.length > 0) {
+                    const sentencesToInsert = unitData.sentences.map((s, idx) => ({
+                        unit_id: unit.id,
+                        sentence_en: s.en,
+                        sentence_kr: s.kr || '',
+                        order_num: idx + 1
+                    }));
+                    const { error: sentenceError } = await insertSentences(sentencesToInsert);
+                    if (sentenceError) throw sentenceError;
+                }
+            }
+        } else if (typeof units === 'object') {
+            // Object format: { "Unit 1": [{en, kr}], "Unit 2": [...] }
+            const unitNames = Object.keys(units);
+            for (let i = 0; i < unitNames.length; i++) {
+                const unitName = unitNames[i];
+                const sentences = units[unitName];
 
-                const { error: sentenceError } = await insertSentences(sentencesToInsert);
-                if (sentenceError) throw sentenceError;
+                const { data: unit, error: unitError } = await createUnit(textbook.id, unitName, i + 1);
+                if (unitError) throw unitError;
+
+                if (sentences && sentences.length > 0) {
+                    const sentencesToInsert = sentences.map((s, idx) => ({
+                        unit_id: unit.id,
+                        sentence_en: s.en,
+                        sentence_kr: s.kr || '',
+                        order_num: idx + 1
+                    }));
+                    const { error: sentenceError } = await insertSentences(sentencesToInsert);
+                    if (sentenceError) throw sentenceError;
+                }
             }
         }
 

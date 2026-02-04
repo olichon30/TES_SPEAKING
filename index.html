@@ -69,17 +69,17 @@
             showLoading('로그인 중...');
 
             try {
-                // Check if onboarding is completed (to get grade)
-                const onboardingComplete = localStorage.getItem('onboardingComplete_' + name);
-                const savedLevel = localStorage.getItem('studentLevel_' + name) || '초등 3학년';
-
-                // Try to find or create student in Supabase
-                let { data: student, error } = await findStudent(name, savedLevel);
+                // Try to find existing student in Supabase
+                let { data: student, error } = await findStudent(name);
                 console.log('🔍 Find student:', { student, error });
 
+                // Check if this is an existing student (already registered)
+                const isExistingStudent = !!student;
+
                 if (!student) {
-                    // Create new student
-                    console.log('📝 Creating student...');
+                    // Create new student - will need onboarding
+                    console.log('📝 Creating new student...');
+                    const savedLevel = localStorage.getItem('studentLevel_' + name) || null;
                     const result = await createStudent(name, savedLevel);
                     student = result.data;
                     error = result.error;
@@ -92,15 +92,21 @@
                     student = {
                         id: Date.now().toString(),
                         name: name,
-                        grade: savedLevel
+                        grade: null
                     };
                 }
 
                 hideLoading();
-                console.log('✅ Final student:', student);
+                console.log('✅ Final student:', student, 'isExisting:', isExistingStudent);
                 sessionStorage.setItem('currentStudent', JSON.stringify(student));
 
-                if (onboardingComplete) {
+                // Existing student in Supabase = already did onboarding
+                // Or check localStorage as backup
+                const localOnboarding = localStorage.getItem('onboardingComplete_' + name);
+
+                if (isExistingStudent || localOnboarding) {
+                    // Also save to localStorage for this device
+                    localStorage.setItem('onboardingComplete_' + name, 'true');
                     window.location.href = 'pages/main.html';
                 } else {
                     window.location.href = 'pages/onboarding.html';

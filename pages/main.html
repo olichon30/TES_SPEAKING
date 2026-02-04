@@ -43,7 +43,7 @@
             <!-- Quick Start -->
             <div class="quick-start-card" onclick="location.href='class.html'">
                 <div class="quick-start-title">학습 계속하기</div>
-                <div class="quick-start-desc">마지막 학습: Unit 3 - 일상 대화</div>
+                <div class="quick-start-desc" id="lastLearningDesc">마지막 학습: -</div>
                 <button class="quick-start-btn">
                     계속하기 →
                 </button>
@@ -119,7 +119,21 @@
             const completed = todayData ? todayData.sessions : 0;
             document.getElementById('learnedCount').textContent = completed;
             document.getElementById('todayCompleted').textContent = completed;
+
+            // Load last learning info
+            loadLastLearning(student);
         });
+
+        function loadLastLearning(student) {
+            const lastLearning = JSON.parse(localStorage.getItem('lastLearning_' + student.name) || 'null');
+            const descEl = document.getElementById('lastLearningDesc');
+
+            if (lastLearning && lastLearning.unitTitle) {
+                descEl.textContent = `마지막 학습: ${lastLearning.unitTitle}`;
+            } else {
+                descEl.textContent = '아직 학습 기록이 없어요';
+            }
+        }
     </script>
 </body>
 
