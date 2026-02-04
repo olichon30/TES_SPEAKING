@@ -54,8 +54,34 @@
         </p>
     </div>
 
+    <!-- Profile Confirmation Modal -->
+    <div id="confirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+         background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+        <div
+            style="background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 360px; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 12px;">👋</div>
+            <h3 style="margin-bottom: 8px;" id="confirmTitle">김민수님,</h3>
+            <p style="color: var(--text-gray); margin-bottom: 8px; font-size: 0.9rem;" id="confirmGrade">하계초등</p>
+            <p style="margin-bottom: 20px;">이 프로필로 로그인할까요?</p>
+
+            <button onclick="confirmLogin()" style="width: 100%; padding: 14px; margin-bottom: 10px;
+                    background: var(--primary); color: white; border: none; border-radius: 12px; 
+                    cursor: pointer; font-size: 1rem; font-weight: 600;">
+                네, 로그인하기
+            </button>
+            <button onclick="createNewProfile()" style="width: 100%; padding: 14px;
+                    background: var(--bg-gray); border: none; border-radius: 12px; 
+                    cursor: pointer; font-size: 0.9rem; color: var(--text-gray);">
+                아니요, 동명이인입니다 (새 프로필)
+            </button>
+        </div>
+    </div>
+
     <script src="js/supabase.js"></script>
     <script>
+        let pendingName = '';
+        let foundStudent = null;
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -66,60 +92,83 @@
                 return;
             }
 
-            showLoading('로그인 중...');
+            showLoading('확인 중...');
+            pendingName = name;
 
             try {
-                // Try to find existing student in Supabase
-                let { data: student, error } = await findStudent(name);
+                // Find first matching student
+                const { data: student, error } = await findStudent(name);
                 console.log('🔍 Find student:', { student, error });
 
-                // Check if this is an existing student (already registered)
-                const isExistingStudent = !!student;
-
-                if (!student) {
-                    // Create new student - will need onboarding
-                    console.log('📝 Creating new student...');
-                    const savedLevel = localStorage.getItem('studentLevel_' + name) || null;
-                    const result = await createStudent(name, savedLevel);
-                    student = result.data;
-                    error = result.error;
-                    console.log('📝 Create result:', { student, error });
-                }
-
-                if (error || !student) {
-                    console.warn('⚠️ Supabase error, using local fallback');
-                    // Fallback to local ID
-                    student = {
-                        id: Date.now().toString(),
-                        name: name,
-                        grade: null
-                    };
-                }
-
                 hideLoading();
-                console.log('✅ Final student:', student, 'isExisting:', isExistingStudent);
-                sessionStorage.setItem('currentStudent', JSON.stringify(student));
 
-                // Existing student in Supabase = already did onboarding
-                // Or check localStorage as backup
-                const localOnboarding = localStorage.getItem('onboardingComplete_' + name);
-
-                if (isExistingStudent || localOnboarding) {
-                    // Also save to localStorage for this device
-                    localStorage.setItem('onboardingComplete_' + name, 'true');
-                    window.location.href = 'pages/main.html';
+                if (student) {
+                    // Found existing student - show confirmation
+                    foundStudent = student;
+                    showConfirmModal(student);
                 } else {
-                    window.location.href = 'pages/onboarding.html';
+                    // No match - create new student directly
+                    await createNewProfile();
                 }
+
             } catch (err) {
                 console.error('❌ Login error:', err);
                 hideLoading();
-                // Fallback
-                const student = { id: Date.now().toString(), name: name, grade: null };
-                sessionStorage.setItem('currentStudent', JSON.stringify(student));
-                window.location.href = 'pages/onboarding.html';
+                showToast('로그인 실패', 'error');
             }
         });
+
+        function showConfirmModal(student) {
+            document.getElementById('confirmTitle').textContent = student.name + '님,';
+            document.getElementById('confirmGrade').textContent = student.grade || '학년 미설정';
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function hideConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        function confirmLogin() {
+            hideConfirmModal();
+            loginAsStudent(foundStudent, true);
+        }
+
+        async function createNewProfile() {
+            hideConfirmModal();
+            showLoading('새 프로필 생성 중...');
+
+            try {
+                const savedLevel = localStorage.getItem('studentLevel_' + pendingName) || null;
+                const { data: student, error } = await createStudent(pendingName, savedLevel);
+
+                if (error || !student) {
+                    throw new Error(error || 'Failed to create student');
+                }
+
+                hideLoading();
+                loginAsStudent(student, false);
+            } catch (err) {
+                console.error('Create student error:', err);
+                hideLoading();
+                // Fallback to local
+                const student = { id: Date.now().toString(), name: pendingName, grade: null };
+                loginAsStudent(student, false);
+            }
+        }
+
+        function loginAsStudent(student, isExisting) {
+            console.log('✅ Login as:', student, 'isExisting:', isExisting);
+            sessionStorage.setItem('currentStudent', JSON.stringify(student));
+
+            const localOnboarding = localStorage.getItem('onboardingComplete_' + student.name);
+
+            if (isExisting || localOnboarding) {
+                localStorage.setItem('onboardingComplete_' + student.name, 'true');
+                window.location.href = 'pages/main.html';
+            } else {
+                window.location.href = 'pages/onboarding.html';
+            }
+        }
     </script>
 </body>
 

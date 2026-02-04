@@ -188,6 +188,22 @@ async function findStudent(name, grade = null) {
     return { data, error: data ? null : error };
 }
 
+// Find ALL students by name (for handling same-name cases)
+async function findStudentsByName(name) {
+    const client = await getSupabase();
+    if (!client) return { data: [], error: 'Supabase not initialized' };
+
+    const safeName = sanitizeInput(name);
+
+    const { data, error } = await client
+        .from('students')
+        .select('*')
+        .eq('name', safeName)
+        .order('created_at', { ascending: true });
+
+    return { data: data || [], error };
+}
+
 // ============================================
 // Textbook Functions
 // ============================================
