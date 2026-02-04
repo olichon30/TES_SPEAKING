@@ -164,12 +164,16 @@ async function findStudent(name, grade = null) {
     // Sanitize inputs
     const safeName = sanitizeInput(name);
 
-    // Search by name only (not name + grade)
-    const { data, error } = await client
+    // Search by name only - use limit(1) instead of single() to avoid error when duplicates exist
+    const { data: results, error } = await client
         .from('students')
         .select('*')
         .eq('name', safeName)
-        .single();
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+    // Get first result (or null if empty)
+    const data = results && results.length > 0 ? results[0] : null;
 
     // If found and grade provided, optionally update grade
     if (data && grade && data.grade !== grade) {
@@ -181,7 +185,7 @@ async function findStudent(name, grade = null) {
         data.grade = safeGrade;
     }
 
-    return { data, error };
+    return { data, error: data ? null : error };
 }
 
 // ============================================
