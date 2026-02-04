@@ -63,6 +63,26 @@
             <button class="record-btn-large" id="recordBtn" onclick="toggleRecording()">
                 <i class="ti ti-microphone" style="font-size: 2rem;"></i>
             </button>
+
+            <!-- Audio Level Meter (shows during recording) -->
+            <div id="audioLevelContainer" class="hidden"
+                style="display: flex; align-items: center; justify-content: center; gap: 3px; height: 40px; margin: 12px 0;">
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+                <div class="audio-bar"
+                    style="width: 6px; background: var(--primary); border-radius: 3px; transition: height 0.05s;"></div>
+            </div>
+
             <p class="text-center text-gray" id="recordHint">버튼을 눌러 말하세요</p>
 
             <!-- Accuracy Display (hidden initially) -->
@@ -100,6 +120,83 @@
         let sentences = [];
         let currentIndex = 0;
         let isRecording = false;
+
+        // Audio Visualizer variables
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let audioStream = null;
+        let animationId = null;
+
+        // Audio visualizer functions
+        async function startAudioVisualizer() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                microphone = audioContext.createMediaStreamSource(audioStream);
+                microphone.connect(analyser);
+
+                const container = document.getElementById('audioLevelContainer');
+                container.classList.remove('hidden');
+                container.style.display = 'flex';
+
+                const bars = container.querySelectorAll('.audio-bar');
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                function updateBars() {
+                    analyser.getByteFrequencyData(dataArray);
+
+                    // Get average volume
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+                    bars.forEach((bar, index) => {
+                        // Create wave effect with slight offset for each bar
+                        const offset = Math.sin(Date.now() / 100 + index) * 5;
+                        const height = Math.max(4, (average / 255) * 40 + offset);
+                        bar.style.height = height + 'px';
+
+                        // Color based on level
+                        if (average > 100) {
+                            bar.style.background = 'var(--primary)';
+                        } else if (average > 30) {
+                            bar.style.background = 'var(--primary-light)';
+                        } else {
+                            bar.style.background = 'var(--text-light)';
+                        }
+                    });
+
+                    animationId = requestAnimationFrame(updateBars);
+                }
+
+                updateBars();
+                console.log('🎵 Audio visualizer started');
+            } catch (err) {
+                console.error('Audio visualizer error:', err);
+            }
+        }
+
+        function stopAudioVisualizer() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            const container = document.getElementById('audioLevelContainer');
+            container.classList.add('hidden');
+
+            console.log('🎵 Audio visualizer stopped');
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             sentences = JSON.parse(sessionStorage.getItem('currentSentences')) || [];
@@ -179,6 +276,9 @@
                 btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
                 hint.textContent = '말하고 있어요... 버튼을 눌러 중지';
 
+                // Start audio visualizer
+                startAudioVisualizer();
+
                 // Hide previous results
                 document.getElementById('accuracyDisplay').classList.add('hidden');
                 document.getElementById('comparisonResult').classList.add('hidden');
@@ -207,6 +307,9 @@
         }
 
         function stopRecordingUI() {
+            // Stop audio visualizer
+            stopAudioVisualizer();
+
             const btn = document.getElementById('recordBtn');
             const retryBtn = document.getElementById('retryBtn');
             const hint = document.getElementById('recordHint');
