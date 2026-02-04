@@ -110,6 +110,14 @@
 
             document.getElementById('totalCount').textContent = sentences.length;
             updateSentence();
+
+            // Check iOS Chrome - show Safari recommendation
+            if (typeof getSpeechRecognitionInfo === 'function') {
+                const info = getSpeechRecognitionInfo();
+                if (info.recommendation) {
+                    showToast('💡 ' + info.recommendation, 'warning', 5000);
+                }
+            }
         });
 
         function updateSentence() {

@@ -1,67 +1,163 @@
 // ============================================
 // Speech Recognition Module
 // For pronunciation accuracy measurement
+// Enhanced iOS/Chrome compatibility
 // ============================================
 
 let recognition = null;
 let recognitionCallback = null;
 let targetText = '';
 
+// Device/Browser Detection
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent);
+const isMobile = isIOS || isAndroid;
+
+// On iOS, only Safari properly supports Web Speech API
+// iOS Chrome uses WebKit but has restrictions
+const hasGoodSpeechSupport = (isIOS && isSafari) || (!isIOS && isChrome) || (!isIOS && !isAndroid);
+
 // Check browser support
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+// Initialize recognition
 if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    try {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        const confidence = event.results[0][0].confidence;
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            const confidence = event.results[0][0].confidence;
 
-        // Calculate accuracy
-        const accuracy = calculateAccuracy(targetText, transcript);
+            // Calculate accuracy
+            const accuracy = calculateAccuracy(targetText, transcript);
 
-        if (recognitionCallback) {
-            recognitionCallback({
-                transcript: transcript,
-                confidence: Math.round(confidence * 100),
-                accuracy: accuracy
-            });
-        }
-    };
+            if (recognitionCallback) {
+                recognitionCallback({
+                    transcript: transcript,
+                    confidence: Math.round(confidence * 100),
+                    accuracy: accuracy
+                });
+            }
+        };
 
-    recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        if (recognitionCallback) {
-            recognitionCallback({
-                transcript: '',
-                confidence: 0,
-                accuracy: 0,
-                error: event.error
-            });
-        }
-    };
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
 
-    recognition.onend = () => {
-        console.log('Speech recognition ended');
-    };
+            let errorMessage = '음성 인식 오류가 발생했습니다.';
+
+            switch (event.error) {
+                case 'not-allowed':
+                case 'permission-denied':
+                    errorMessage = '마이크 권한이 필요합니다. 설정에서 마이크를 허용해주세요.';
+                    break;
+                case 'no-speech':
+                    errorMessage = '음성이 감지되지 않았습니다. 다시 시도해주세요.';
+                    break;
+                case 'network':
+                    errorMessage = '네트워크 오류입니다. 인터넷 연결을 확인해주세요.';
+                    break;
+                case 'audio-capture':
+                    errorMessage = '마이크를 찾을 수 없습니다.';
+                    if (isIOS && !isSafari) {
+                        errorMessage += ' iOS에서는 Safari 브라우저를 사용해주세요.';
+                    }
+                    break;
+                case 'aborted':
+                    errorMessage = '음성 인식이 취소되었습니다.';
+                    break;
+            }
+
+            if (recognitionCallback) {
+                recognitionCallback({
+                    transcript: '',
+                    confidence: 0,
+                    accuracy: 0,
+                    error: event.error,
+                    errorMessage: errorMessage
+                });
+            }
+        };
+
+        recognition.onend = () => {
+            console.log('Speech recognition ended');
+        };
+
+        console.log('✅ Speech recognition initialized', { isIOS, isSafari, hasGoodSpeechSupport });
+    } catch (e) {
+        console.error('Failed to initialize speech recognition:', e);
+        recognition = null;
+    }
 }
 
 // Start speech recognition
-function startSpeechRecognition(target, callback) {
+async function startSpeechRecognition(target, callback) {
+    // Check if not supported at all
     if (!recognition) {
+        let errorMessage = '음성인식이 지원되지 않는 브라우저입니다.';
+
+        if (isIOS) {
+            errorMessage = 'iOS에서는 Safari 브라우저를 사용해주세요. (설정 > Safari에서 열기)';
+        } else if (isAndroid) {
+            errorMessage = 'Chrome 브라우저에서 열어주세요.';
+        } else {
+            errorMessage = 'Chrome 또는 Edge 브라우저를 사용해주세요.';
+        }
+
         console.warn('Speech recognition not supported');
-        // Return error - no fake results!
         callback({
             transcript: '',
             confidence: 0,
             accuracy: 0,
             error: 'not-supported',
-            errorMessage: '음성인식이 지원되지 않습니다. Chrome 브라우저를 사용해주세요.'
+            errorMessage: errorMessage
         });
         return;
+    }
+
+    // Request microphone permission FIRST (important for mobile devices!)
+    try {
+        console.log('🎤 Requesting microphone permission...');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop the stream immediately - we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log('✅ Microphone permission granted');
+    } catch (micError) {
+        console.error('Microphone permission error:', micError);
+
+        let errorMessage = '마이크 권한이 필요합니다.';
+
+        if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+            errorMessage = '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크를 허용해주세요.';
+        } else if (micError.name === 'NotFoundError') {
+            errorMessage = '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.';
+        } else if (micError.name === 'NotReadableError') {
+            errorMessage = '마이크가 다른 앱에서 사용 중입니다.';
+        }
+
+        if (isIOS && !isSafari) {
+            errorMessage += ' (iOS는 Safari 사용 권장)';
+        }
+
+        callback({
+            transcript: '',
+            confidence: 0,
+            accuracy: 0,
+            error: 'mic-permission',
+            errorMessage: errorMessage
+        });
+        return;
+    }
+
+    // Warn about iOS Chrome limitations
+    if (isIOS && !isSafari) {
+        console.warn('⚠️ iOS Chrome has limited speech recognition support');
     }
 
     targetText = target.toLowerCase().trim();
@@ -69,8 +165,24 @@ function startSpeechRecognition(target, callback) {
 
     try {
         recognition.start();
+        console.log('🎤 Speech recognition started for:', targetText.substring(0, 30) + '...');
     } catch (e) {
         console.error('Failed to start recognition:', e);
+
+        let errorMessage = '음성 인식을 시작할 수 없습니다.';
+        if (isIOS && !isSafari) {
+            errorMessage = 'iOS Chrome에서는 음성 인식이 제한됩니다. Safari를 사용해주세요.';
+        } else if (e.message && e.message.includes('already started')) {
+            errorMessage = '음성 인식이 이미 실행 중입니다. 잠시 후 다시 시도해주세요.';
+        }
+
+        callback({
+            transcript: '',
+            confidence: 0,
+            accuracy: 0,
+            error: 'start-failed',
+            errorMessage: errorMessage
+        });
     }
 }
 
@@ -81,6 +193,22 @@ function stopSpeechRecognition() {
             recognition.stop();
         } catch (e) { }
     }
+}
+
+// Check if speech recognition is available
+function isSpeechRecognitionAvailable() {
+    return !!recognition;
+}
+
+// Get speech recognition status info
+function getSpeechRecognitionInfo() {
+    return {
+        available: !!recognition,
+        isIOS: isIOS,
+        isSafari: isSafari,
+        hasGoodSupport: hasGoodSpeechSupport,
+        recommendation: isIOS && !isSafari ? 'Safari 브라우저를 사용해주세요' : null
+    };
 }
 
 // Calculate accuracy between target and spoken text
