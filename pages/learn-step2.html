@@ -184,14 +184,28 @@
                 cancelAnimationFrame(animationId);
                 animationId = null;
             }
+
+            // Disconnect microphone source (important for reuse)
+            if (microphone) {
+                try {
+                    microphone.disconnect();
+                } catch (e) { }
+                microphone = null;
+            }
+
             if (audioStream) {
                 audioStream.getTracks().forEach(track => track.stop());
                 audioStream = null;
             }
+
+            // IMPORTANT: Use suspend() instead of close() for iOS Safari compatibility
+            // close() makes AudioContext permanently unusable on iOS
             if (audioContext && audioContext.state !== 'closed') {
-                audioContext.close();
-                audioContext = null;
+                audioContext.suspend();
+                // Don't set to null - we'll reuse it or create new one
             }
+            audioContext = null;
+            analyser = null;
 
             const container = document.getElementById('audioLevelContainer');
             container.classList.add('hidden');
