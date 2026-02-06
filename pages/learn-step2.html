@@ -372,12 +372,20 @@
             sessionStorage.setItem('learningProgress', JSON.stringify(progress));
 
             // Show comparison with highlighted differences
-            if (transcript) {
-                const targetText = sentences[currentIndex].en;
+            const targetText = sentences[currentIndex].en;
+            if (transcript && transcript.trim()) {
                 const comparisonHtml = compareWords(targetText, transcript);
                 comparisonDiv.innerHTML = comparisonHtml;
-                comparisonDiv.classList.remove('hidden');
+            } else {
+                // Debug: show that transcript was empty
+                comparisonDiv.innerHTML = `
+                    <div style="color: #F59E0B; font-size: 0.9rem;">
+                        ⚠️ 음성이 인식되지 않았습니다<br>
+                        <small style="color: var(--text-gray);">인식된 텍스트: "${transcript || '(없음)'}"</small>
+                    </div>
+                `;
             }
+            comparisonDiv.classList.remove('hidden');
         }
 
         // Compare target and spoken words, highlight differences
