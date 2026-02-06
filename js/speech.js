@@ -97,7 +97,7 @@ if (SpeechRecognition) {
 }
 
 // Start speech recognition
-async function startSpeechRecognition(target, callback) {
+async function startSpeechRecognition(target, callback, options = {}) {
     // Check if not supported at all
     if (!recognition) {
         let errorMessage = '음성인식이 지원되지 않는 브라우저입니다.';
@@ -122,37 +122,42 @@ async function startSpeechRecognition(target, callback) {
     }
 
     // Request microphone permission FIRST (important for mobile devices!)
-    try {
-        console.log('🎤 Requesting microphone permission...');
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Stop the stream immediately - we just needed permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log('✅ Microphone permission granted');
-    } catch (micError) {
-        console.error('Microphone permission error:', micError);
+    // BUT allow skipping if the caller already handled it (e.g., visualizer running)
+    if (!options.skipPermissionCheck) {
+        try {
+            console.log('🎤 Requesting microphone permission...');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Stop the stream immediately - we just needed permission
+            stream.getTracks().forEach(track => track.stop());
+            console.log('✅ Microphone permission granted');
+        } catch (micError) {
+            console.error('Microphone permission error:', micError);
 
-        let errorMessage = '마이크 권한이 필요합니다.';
+            let errorMessage = '마이크 권한이 필요합니다.';
 
-        if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
-            errorMessage = '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크를 허용해주세요.';
-        } else if (micError.name === 'NotFoundError') {
-            errorMessage = '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.';
-        } else if (micError.name === 'NotReadableError') {
-            errorMessage = '마이크가 다른 앱에서 사용 중입니다.';
+            if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+                errorMessage = '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크를 허용해주세요.';
+            } else if (micError.name === 'NotFoundError') {
+                errorMessage = '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.';
+            } else if (micError.name === 'NotReadableError') {
+                errorMessage = '마이크가 다른 앱에서 사용 중입니다.';
+            }
+
+            if (isIOS && !isSafari) {
+                errorMessage += ' (iOS는 Safari 사용 권장)';
+            }
+
+            callback({
+                transcript: '',
+                confidence: 0,
+                accuracy: 0,
+                error: 'mic-permission',
+                errorMessage: errorMessage
+            });
+            return;
         }
-
-        if (isIOS && !isSafari) {
-            errorMessage += ' (iOS는 Safari 사용 권장)';
-        }
-
-        callback({
-            transcript: '',
-            confidence: 0,
-            accuracy: 0,
-            error: 'mic-permission',
-            errorMessage: errorMessage
-        });
-        return;
+    } else {
+        console.log('🎤 Skipping explicit permission check (caller handled it)');
     }
 
     // Warn about iOS Chrome limitations
