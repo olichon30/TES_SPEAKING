@@ -141,13 +141,18 @@
             if (!isRecording) {
                 // Start recording
                 isRecording = true;
+
+                // Show main record button (important when coming from retry button)
+                btn.classList.remove('hidden');
+                retryBtn.classList.add('hidden');
+                hint.classList.remove('hidden');
+
                 btn.classList.add('recording');
                 btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
                 hint.textContent = '말하고 있어요... 버튼을 눌러 중지';
 
                 // Hide previous results
                 document.getElementById('accuracyDisplay').classList.add('hidden');
-                retryBtn.classList.add('hidden');
                 document.getElementById('comparisonResult').classList.add('hidden');
 
                 // Start speech recognition

@@ -147,6 +147,20 @@ let activeRequest = null;
 
 // Start speech recognition
 async function startSpeechRecognition(target, callback, options = {}) {
+    // CRITICAL: Abort any previous session before starting new one
+    // This fixes iOS Safari issue where second sentence fails
+    if (recognition) {
+        try {
+            recognition.abort();
+            console.log('🔄 Aborted previous recognition session');
+        } catch (e) {
+            // Ignore abort errors
+        }
+    }
+
+    // Clear previous active request state
+    activeRequest = null;
+
     // Check if not supported at all
     if (!recognition) {
         let errorMessage = '음성인식이 지원되지 않는 브라우저입니다.';
@@ -170,7 +184,7 @@ async function startSpeechRecognition(target, callback, options = {}) {
         return;
     }
 
-    // Reset active request state
+    // Reset active request state for new session
     activeRequest = {
         startTime: Date.now(),
         hasResult: false
