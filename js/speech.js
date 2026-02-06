@@ -26,8 +26,10 @@ if (SpeechRecognition) {
         recognition.maxAlternatives = 1;
 
         recognition.onresult = (event) => {
+            console.log('🎯 onresult fired!', event.results);
             const transcript = event.results[0][0].transcript;
             const confidence = event.results[0][0].confidence;
+            console.log('📝 Transcript:', transcript, 'Confidence:', confidence);
 
             // Calculate accuracy
             const accuracy = calculateAccuracy(targetText, transcript);
@@ -82,7 +84,20 @@ if (SpeechRecognition) {
         };
 
         recognition.onend = () => {
-            console.log('Speech recognition ended');
+            console.log('🔚 Speech recognition ended');
+            // CRITICAL: If ended without result (no onresult called), notify callback
+            // This prevents UI from freezing when recognition ends silently
+            if (recognitionCallback) {
+                console.warn('⚠️ Recognition ended without result - calling callback with no-speech');
+                recognitionCallback({
+                    transcript: '',
+                    confidence: 0,
+                    accuracy: 0,
+                    error: 'no-speech',
+                    errorMessage: '음성이 감지되지 않았습니다. 다시 시도해주세요.'
+                });
+                recognitionCallback = null;
+            }
         };
 
         console.log('✅ Speech recognition initialized');
