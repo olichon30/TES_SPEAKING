@@ -155,13 +155,14 @@
                     bars.forEach((bar, index) => {
                         // Create wave effect with slight offset for each bar
                         const offset = Math.sin(Date.now() / 100 + index) * 5;
-                        const height = Math.max(4, (average / 255) * 40 + offset);
+                        // Increased multiplier (40 -> 60) for better visibility
+                        const height = Math.max(4, (average / 255) * 60 + offset);
                         bar.style.height = height + 'px';
 
-                        // Color based on level
-                        if (average > 100) {
+                        // Color based on level - Lowered thresholds for better feedback
+                        if (average > 50) { // Was 100
                             bar.style.background = 'var(--primary)';
-                        } else if (average > 30) {
+                        } else if (average > 10) { // Was 30
                             bar.style.background = 'var(--primary-light)';
                         } else {
                             bar.style.background = 'var(--text-light)';
