@@ -158,16 +158,18 @@
                 // Start speech recognition
                 if (typeof startSpeechRecognition === 'function') {
                     startSpeechRecognition(sentences[currentIndex].en, (result) => {
+                        // Stop UI first to reset state
+                        stopRecordingUI();
+
                         if (result.error) {
                             showError(result.errorMessage || '음성 인식 오류가 발생했습니다.');
                         } else {
                             showAccuracy(result.accuracy, result.transcript);
                         }
-                        stopRecordingUI();
                     });
                 } else {
-                    showError('음성인식 모듈을 불러올 수 없습니다.');
                     stopRecordingUI();
+                    showError('음성인식 모듈을 불러올 수 없습니다.');
                 }
             } else {
                 // Stop recording
@@ -192,6 +194,15 @@
             retryBtn.classList.remove('hidden');
             retryBtn.style.display = 'flex';
             hint.classList.add('hidden');
+        }
+
+        function showError(message) {
+            const display = document.getElementById('accuracyDisplay');
+            const hint = document.getElementById('recordHint');
+
+            display.classList.add('hidden');
+            hint.innerHTML = '<span style="color: #e53935;">' + message + '</span>';
+            hint.classList.remove('hidden'); // Ensure visible
         }
 
         function showAccuracy(accuracy, transcript) {
