@@ -26,14 +26,26 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 if (SpeechRecognition) {
     try {
         recognition = new SpeechRecognition();
-        recognition.continuous = false;
+        // Android: continuous = true to prevent premature timeouts
+        recognition.continuous = isAndroid;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
         recognition.maxAlternatives = 1;
 
         recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            const confidence = event.results[0][0].confidence;
+            // In continuous mode, results are an array. Get the latest one.
+            const lastResultIndex = event.results.length - 1;
+            const transcript = event.results[lastResultIndex][0].transcript;
+            const confidence = event.results[lastResultIndex][0].confidence;
+
+            // IGNORE premature results (less than 500ms)
+            // This prevents "ding" sounds or immediate glitches from being treated as speech
+            if (activeRequest && (Date.now() - activeRequest.startTime) < 500 && transcript.length < 2) {
+                console.warn('⚠️ Premature result ignored:', transcript);
+                return;
+            }
+
+            if (activeRequest) activeRequest.hasResult = true;
 
             // Calculate accuracy
             const accuracy = calculateAccuracy(targetText, transcript);
@@ -49,6 +61,7 @@ if (SpeechRecognition) {
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
+            if (activeRequest) activeRequest.hasResult = true; // Treated as handled
 
             let errorMessage = '음성 인식 오류가 발생했습니다.';
 
@@ -70,6 +83,7 @@ if (SpeechRecognition) {
                     }
                     break;
                 case 'aborted':
+                    // If aborted quickly, it might be the conflict retry logic or app backgrounding
                     errorMessage = '음성 인식이 취소되었습니다.';
                     break;
             }
@@ -87,6 +101,38 @@ if (SpeechRecognition) {
 
         recognition.onend = () => {
             console.log('Speech recognition ended');
+            // If ended WITHOUT result and WITHOUT error (Silent close)
+            // This happens on some Androids if mic is pre-empted or silence timeout
+            if (activeRequest && !activeRequest.hasResult) {
+                console.warn('⚠️ Ended without result/error (Silent Close)');
+
+                // If it was very short (< 1s), treat as aborted/conflict
+                if ((Date.now() - activeRequest.startTime) < 1000) {
+                    if (recognitionCallback) {
+                        recognitionCallback({
+                            transcript: '',
+                            confidence: 0,
+                            accuracy: 0,
+                            error: 'aborted', // Treat as aborted so UI resets
+                            errorMessage: '음성 인식이 중단되었습니다 (다른 앱 사용 등).'
+                        });
+                    }
+                }
+                // Otherwise likely silence timeout or normal stop
+                // We should probably treat it as no-speech if we expected input
+                else {
+                    if (recognitionCallback) {
+                        recognitionCallback({
+                            transcript: '',
+                            confidence: 0,
+                            accuracy: 0,
+                            error: 'no-speech',
+                            errorMessage: '음성이 감지되지 않았습니다.'
+                        });
+                    }
+                }
+            }
+            activeRequest = null;
         };
 
         console.log('✅ Speech recognition initialized', { isIOS, isSafari, hasGoodSpeechSupport });
@@ -95,6 +141,9 @@ if (SpeechRecognition) {
         recognition = null;
     }
 }
+
+// Track active request state
+let activeRequest = null;
 
 // Start speech recognition
 async function startSpeechRecognition(target, callback, options = {}) {
@@ -120,6 +169,12 @@ async function startSpeechRecognition(target, callback, options = {}) {
         });
         return;
     }
+
+    // Reset active request state
+    activeRequest = {
+        startTime: Date.now(),
+        hasResult: false
+    };
 
     // Request microphone permission FIRST (important for mobile devices!)
     // BUT allow skipping if the caller already handled it (e.g., visualizer running)

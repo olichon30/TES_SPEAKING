@@ -215,6 +215,17 @@
                 if (info.recommendation) {
                     showToast('💡 ' + info.recommendation, 'warning', 5000);
                 }
+
+                // Samsung Internet Recommendation for Android Chrome
+                const isAndroid = /Android/.test(navigator.userAgent);
+                const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent) && !/SamsungBrowser/.test(navigator.userAgent);
+                const isSamsungDevice = /Samsung|SM-|Galaxy/i.test(navigator.userAgent);
+
+                if (isAndroid && isChrome && isSamsungDevice) {
+                    setTimeout(() => {
+                        showToast('💡 음성 인식이 잘 안 되면 "삼성 인터넷" 브라우저를 사용해보세요.', 'info', 6000);
+                    }, 1000);
+                }
             }
         });
 
