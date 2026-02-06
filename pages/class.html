@@ -13,6 +13,88 @@
         body {
             font-family: 'Noto Sans KR', sans-serif;
         }
+
+        /* Textbook Grid View (matches unit.html styles mostly, keeping grid specific) */
+        .textbook-view {
+            display: none;
+        }
+
+        .textbook-view.active {
+            display: block;
+        }
+
+        .textbook-header {
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .textbook-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin: 0;
+        }
+
+        .textbook-header p {
+            font-size: 0.9rem;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        .textbook-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .textbook-card {
+            background: var(--bg-white);
+            border-radius: 20px;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .textbook-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .textbook-card:active {
+            transform: scale(0.98);
+        }
+
+        .textbook-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--primary-pale);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+
+        .textbook-icon i {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+
+        .textbook-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .textbook-units {
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
     </style>
 </head>
 
@@ -20,17 +102,29 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <a href="main.html" class="back-btn">←</a>
-            <h1 class="header-title">나의 클래스</h1>
+            <a href="main.html" class="back-btn" id="backBtn">←</a>
+            <h1 class="header-title" id="headerTitle">나의 클래스</h1>
             <div class="header-action"></div>
         </header>
 
         <div class="page-content">
-            <p class="text-gray mb-2" id="pageSubtitle">클래스를 선택하세요</p>
+            <!-- View 1: Series List -->
+            <div id="seriesView">
+                <p class="text-gray mb-3">학습할 교과서를 선택하세요</p>
+                <div id="seriesList">
+                    <!-- Will be populated by JS -->
+                </div>
+            </div>
 
-            <!-- Class/Textbook Grid -->
-            <div class="grid-2" id="contentGrid">
-                <!-- Will be populated by JS -->
+            <!-- View 2: Textbook Grid -->
+            <div id="textbookView" class="textbook-view">
+                <div class="textbook-header">
+                    <h2 id="selectedSeriesName"></h2>
+                    <p id="selectedSeriesCount"></p>
+                </div>
+                <div class="textbook-grid" id="textbookGrid">
+                    <!-- Will be populated by JS -->
+                </div>
             </div>
         </div>
 
@@ -57,10 +151,10 @@
 
     <script src="../js/supabase.js"></script>
     <script>
-        let classes = [];
-        let textbooks = [];
-        let currentView = 'classes';
-        let selectedClass = null;
+        let allTextbooks = [];
+        let seriesMap = {}; // { seriesName: [textbooks] }
+        let currentView = 'series'; // 'series' or 'textbooks'
+        let selectedSeries = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             const student = JSON.parse(sessionStorage.getItem('currentStudent'));
@@ -69,103 +163,41 @@
                 return;
             }
 
-            // Load textbooks from Supabase
             await loadClassData();
-
-            // ALWAYS start at class view when entering this page fresh
-            // Only restore 'textbooks' view if navigating back from unit.html
-            const cameFromUnit = document.referrer.includes('unit.html');
-            const savedView = sessionStorage.getItem('classView');
-            const savedClassId = sessionStorage.getItem('selectedClassId');
-
-            if (cameFromUnit && savedView === 'textbooks' && savedClassId) {
-                selectedClass = classes.find(c => c.id === savedClassId);
-                if (selectedClass) {
-                    currentView = 'textbooks';
-                    renderTextbooks();
-                    return;
-                }
-            }
-
-            // Default: always show classes first
-            sessionStorage.removeItem('classView');
-            sessionStorage.removeItem('selectedClassId');
-            renderClasses();
+            renderSeriesList();
+            setupBackButton();
         });
+
+        // Parse series name from textbook name
+        function parseSeriesName(textbookName) {
+            let series = textbookName.replace(/_L\d+$/i, '').replace(/ L\d+$/i, '');
+            series = series.replace(/_/g, ' ');
+            return series.trim();
+        }
+
+        // Parse level from textbook name
+        function parseLevel(textbookName) {
+            const match = textbookName.match(/[_\s]L(\d+)$/i);
+            return match ? `L${match[1]}` : textbookName;
+        }
 
         async function loadClassData() {
             showLoading('데이터 불러오는 중...');
 
             try {
-                // Get textbooks from Supabase
                 const { data, error } = await getTextbooks();
-
                 if (error) throw error;
 
-                textbooks = data || [];
+                allTextbooks = data || [];
+                seriesMap = {};
 
-                // Each textbook from Supabase becomes a separate class
-                const textbookClasses = await Promise.all(
-                    textbooks.map(async (t) => {
-                        const { data: units } = await getUnitsByTextbook(t.id);
-                        return {
-                            id: t.id,
-                            name: t.name,
-                            icon: t.icon || '<i class="ti ti-book-filled" style="font-size: 4rem; color: var(--primary);"></i>',
-                            unitCount: units?.length || 0,
-                            isTextbook: true // Flag to skip textbook selection
-                        };
-                    })
-                );
-
-                // Sample class with demo units
-                const sampleClass = {
+                // Add SAMPLE CLASS
+                seriesMap['SAMPLE CLASS'] = [{
                     id: 'sample',
                     name: 'SAMPLE CLASS',
-                    icon: '<i class="ti ti-file-invoice" style="font-size: 4rem; color: var(--primary);"></i>',
+                    displayName: '샘플 학습',
+                    icon: '<i class="ti ti-file-invoice"></i>',
                     unitCount: 3,
-                    isTextbook: true,
-                    isDemoClass: true,
-                    sampleUnits: [
-                        {
-                            id: 'sample-1', name: 'Unit 1. 인사하기', sentences: [
-                                { en: 'Hello, how are you?', kr: '안녕, 어떻게 지내?' },
-                                { en: 'I am fine, thank you.', kr: '난 괜찮아, 고마워.' },
-                                { en: 'Nice to meet you.', kr: '만나서 반가워.' }
-                            ]
-                        },
-                        {
-                            id: 'sample-2', name: 'Unit 2. 자기소개', sentences: [
-                                { en: 'My name is Tom.', kr: '내 이름은 톰이야.' },
-                                { en: 'I am 10 years old.', kr: '나는 10살이에요.' },
-                                { en: 'I like to play soccer.', kr: '나는 축구하는 것을 좋아해.' }
-                            ]
-                        },
-                        {
-                            id: 'sample-3', name: 'Unit 3. 학교생활', sentences: [
-                                { en: 'I go to school every day.', kr: '나는 매일 학교에 가요.' },
-                                { en: 'My favorite subject is math.', kr: '내가 가장 좋아하는 과목은 수학이에요.' },
-                                { en: 'I study English hard.', kr: '나는 영어를 열심히 공부해요.' }
-                            ]
-                        }
-                    ]
-                };
-
-                // Start with SAMPLE CLASS
-                classes = [sampleClass];
-
-                // Add textbook classes
-                classes = [...classes, ...textbookClasses];
-
-            } catch (e) {
-                console.error('Failed to load textbooks:', e);
-                // Fallback to demo data with sample class
-                classes = [{
-                    id: 'sample',
-                    name: 'SAMPLE CLASS',
-                    icon: '<i class="ti ti-school"></i>',
-                    unitCount: 3,
-                    isTextbook: true,
                     isDemoClass: true,
                     sampleUnits: [
                         {
@@ -191,60 +223,155 @@
                         }
                     ]
                 }];
+
+                // Group textbooks by series
+                for (const textbook of allTextbooks) {
+                    const seriesName = parseSeriesName(textbook.name);
+                    if (!seriesMap[seriesName]) {
+                        seriesMap[seriesName] = [];
+                    }
+
+                    const { data: units } = await getUnitsByTextbook(textbook.id);
+
+                    seriesMap[seriesName].push({
+                        id: textbook.id,
+                        name: textbook.name,
+                        displayName: parseLevel(textbook.name),
+                        icon: textbook.icon || '<i class="ti ti-book-filled"></i>',
+                        unitCount: units?.length || 0
+                    });
+                }
+
+                // Sort by level
+                for (const series in seriesMap) {
+                    seriesMap[series].sort((a, b) => {
+                        const levelA = parseInt(a.displayName.replace(/\D/g, '')) || 0;
+                        const levelB = parseInt(b.displayName.replace(/\D/g, '')) || 0;
+                        return levelA - levelB;
+                    });
+                }
+
+            } catch (e) {
+                console.error('Failed to load textbooks:', e);
+                seriesMap = {
+                    'SAMPLE CLASS': [{
+                        id: 'sample',
+                        name: 'SAMPLE CLASS',
+                        displayName: '샘플 학습',
+                        icon: '<i class="ti ti-file-invoice"></i>',
+                        unitCount: 3,
+                        isDemoClass: true,
+                        sampleUnits: []
+                    }]
+                };
             }
 
             hideLoading();
         }
 
-        function renderClasses() {
-            currentView = 'classes';
-            sessionStorage.setItem('classView', 'classes');
-            sessionStorage.removeItem('selectedClassId');
+        function renderSeriesList() {
+            currentView = 'series';
+            document.getElementById('seriesView').style.display = 'block';
+            document.getElementById('textbookView').classList.remove('active');
+            document.getElementById('headerTitle').textContent = '나의 클래스';
+            document.getElementById('backBtn').href = 'main.html';
 
-            document.getElementById('pageSubtitle').textContent = '학습할 교과서를 선택하세요';
-            const grid = document.getElementById('contentGrid');
+            const list = document.getElementById('seriesList');
+            const seriesNames = Object.keys(seriesMap);
 
-            grid.innerHTML = classes.map(cls => `
-                <div class="unit-card card-clickable" onclick="selectClass('${cls.id}')">
-                    <div class="unit-icon">${cls.icon}</div>
-                    <div class="unit-name">${cls.name}</div>
-                    <div class="unit-progress">${cls.isDemoClass ? '샘플 학습' : cls.unitCount + '개 유닛'}</div>
+            list.innerHTML = seriesNames.map(name => {
+                const textbooks = seriesMap[name];
+                const count = textbooks.length;
+                const isSample = name === 'SAMPLE CLASS';
+
+                // Use standard .list-card structure
+                return `
+                    <div class="list-card card-clickable" onclick="selectSeries('${name}')">
+                        <div class="list-icon">
+                            <i class="ti ${isSample ? 'ti-file-invoice' : 'ti-folder'}"></i>
+                        </div>
+                        <div class="list-content">
+                            <div class="list-title">${name}</div>
+                            <div class="list-subtitle">${isSample ? '샘플' : count + '개 교과서'}</div>
+                        </div>
+                        <span class="list-arrow"><i class="ti ti-chevron-right"></i></span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectSeries(seriesName) {
+            selectedSeries = seriesName;
+            currentView = 'textbooks';
+
+            // Hide series view, show textbook view
+            document.getElementById('seriesView').style.display = 'none';
+            document.getElementById('textbookView').classList.add('active');
+            document.getElementById('headerTitle').textContent = seriesName;
+
+            // Update header info
+            const textbooks = seriesMap[seriesName] || [];
+            document.getElementById('selectedSeriesName').textContent = seriesName;
+            document.getElementById('selectedSeriesCount').textContent =
+                textbooks[0]?.isDemoClass ? '샘플 학습 클래스' : `${textbooks.length}개 교과서`;
+
+            // Render textbook grid
+            renderTextbookGrid(textbooks);
+        }
+
+        function renderTextbookGrid(textbooks) {
+            const grid = document.getElementById('textbookGrid');
+
+            grid.innerHTML = textbooks.map(tb => `
+                <div class="textbook-card" onclick="selectTextbook('${tb.id}')">
+                    <div class="textbook-icon">
+                        ${tb.icon}
+                    </div>
+                    <div class="textbook-name">${tb.displayName}</div>
+                    <div class="textbook-units">${tb.isDemoClass ? '샘플 학습' : tb.unitCount + '개 유닛'}</div>
                 </div>
             `).join('');
         }
 
-        function selectClass(classId) {
-            selectedClass = classes.find(c => c.id === classId);
-            if (!selectedClass) return;
-
-            if (selectedClass.isDemoClass && selectedClass.sampleUnits) {
-                // Demo class - store sample data and navigate to unit.html
-                sessionStorage.setItem('currentTextbook', JSON.stringify({
-                    id: selectedClass.id,
-                    name: selectedClass.name,
-                    icon: selectedClass.icon,
-                    isSample: true
-                }));
-                sessionStorage.setItem('sampleUnits', JSON.stringify(selectedClass.sampleUnits));
-                sessionStorage.setItem('currentClass', JSON.stringify(selectedClass));
-                window.location.href = 'unit.html';
-                return;
+        function selectTextbook(textbookId) {
+            let textbook = null;
+            for (const series in seriesMap) {
+                textbook = seriesMap[series].find(t => t.id === textbookId);
+                if (textbook) break;
             }
 
-            // Textbook class - go directly to unit.html
-            sessionStorage.setItem('currentTextbook', JSON.stringify({
-                id: selectedClass.id,
-                name: selectedClass.name,
-                icon: selectedClass.icon
-            }));
-            sessionStorage.setItem('currentClass', JSON.stringify(selectedClass));
+            if (!textbook) return;
+
+            if (textbook.isDemoClass && textbook.sampleUnits) {
+                sessionStorage.setItem('currentTextbook', JSON.stringify({
+                    id: textbook.id,
+                    name: textbook.name,
+                    icon: textbook.icon,
+                    isSample: true
+                }));
+                sessionStorage.setItem('sampleUnits', JSON.stringify(textbook.sampleUnits));
+                sessionStorage.setItem('currentClass', JSON.stringify(textbook));
+            } else {
+                sessionStorage.setItem('currentTextbook', JSON.stringify({
+                    id: textbook.id,
+                    name: textbook.name,
+                    icon: textbook.icon
+                }));
+                sessionStorage.setItem('currentClass', JSON.stringify(textbook));
+            }
+
             window.location.href = 'unit.html';
         }
 
-        // Handle back button
-        document.querySelector('.back-btn').addEventListener('click', (e) => {
-            // Always go back to main
-        });
+        function setupBackButton() {
+            document.getElementById('backBtn').addEventListener('click', (e) => {
+                if (currentView === 'textbooks') {
+                    e.preventDefault();
+                    renderSeriesList();
+                }
+                // If series view, let it go to main.html
+            });
+        }
     </script>
 </body>
 
