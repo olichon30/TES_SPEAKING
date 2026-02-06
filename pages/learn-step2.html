@@ -302,11 +302,18 @@
                 btn.innerHTML = '<i class="ti ti-player-stop" style="font-size: 2rem;"></i>';
                 hint.textContent = '말하고 있어요... 버튼을 눌러 중지';
 
-                // Start audio visualizer (optional - don't fail if it doesn't work)
-                try {
-                    await startAudioVisualizer();
-                } catch (e) {
-                    console.warn('Visualizer start failed:', e);
+                // Check for Android to avoid mic conflict
+                const isAndroid = /Android/.test(navigator.userAgent);
+
+                // Start audio visualizer (Skip on Android to prevent conflict)
+                if (!isAndroid) {
+                    try {
+                        await startAudioVisualizer();
+                    } catch (e) {
+                        console.warn('Visualizer start failed:', e);
+                    }
+                } else {
+                    console.log('🤖 Android detected - skipping visualizer to prevent mic conflict');
                 }
 
                 // Hide previous results
