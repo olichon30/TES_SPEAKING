@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
     <link rel="apple-touch-icon" href="../favicon.png">
+    <link rel="manifest" href="../manifest.json">
 </head>
 
 <body>
@@ -128,6 +129,16 @@
                 { id: '2', sentence_kr: '오늘 날씨가 좋습니다.', sentence_en: 'The weather is nice today.', order_num: 2 },
                 { id: '3', sentence_kr: '저는 영어를 공부합니다.', sentence_en: 'I study English.', order_num: 3 }
             ];
+        }
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../service-worker.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed: ', err));
+            });
         }
     </script>
 </body>

@@ -98,6 +98,7 @@
     </style>
     <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
     <link rel="apple-touch-icon" href="../favicon.png">
+    <link rel="manifest" href="../manifest.json">
 </head>
 
 <body>
@@ -377,6 +378,16 @@
                     renderSeriesList();
                 }
                 // If series view, let it go to main.html
+            });
+        }
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../service-worker.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed: ', err));
             });
         }
     </script>
