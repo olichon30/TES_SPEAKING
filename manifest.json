@@ -5,11 +5,35 @@
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#2D9596",
+    "description": "TES Speaking - 누구나 쉽게 말하는 영어 스피킹 필수 앱. 녹음, 피드백, 공유 기능까지!",
+    "orientation": "portrait",
+    "id": "/",
+    "categories": [
+        "education",
+        "productivity"
+    ],
+    "lang": "ko",
     "icons": [
         {
             "src": "favicon.png",
             "sizes": "512x512",
             "type": "image/png"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "favicon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "TES Speaking Logo"
+        },
+        {
+            "src": "favicon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "TES Speaking Mobile"
         }
     ]
 }
