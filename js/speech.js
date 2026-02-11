@@ -83,10 +83,34 @@ function stopSpeechRecognition() {
     }
 }
 
+// Number word mappings (both directions)
+const numberToWord = {
+    '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+    '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine',
+    '10': 'ten', '11': 'eleven', '12': 'twelve', '13': 'thirteen',
+    '14': 'fourteen', '15': 'fifteen', '16': 'sixteen', '17': 'seventeen',
+    '18': 'eighteen', '19': 'nineteen', '20': 'twenty', '30': 'thirty',
+    '40': 'forty', '50': 'fifty', '60': 'sixty', '70': 'seventy',
+    '80': 'eighty', '90': 'ninety', '100': 'hundred'
+};
+const wordToNumber = Object.fromEntries(Object.entries(numberToWord).map(([k, v]) => [v, k]));
+
+// Normalize a word: strip punctuation, convert numbers to words
+function normalizeWord(word) {
+    // Remove all punctuation (commas, periods, quotes, etc.)
+    word = word.replace(/[^a-z0-9]/g, '');
+    // If it's a number, convert to word
+    if (numberToWord[word]) return numberToWord[word];
+    // If it's a word for a number, convert to the word form (already is)
+    return word;
+}
+
 // Calculate accuracy between target and spoken text
 function calculateAccuracy(target, spoken) {
-    const targetWords = target.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
-    const spokenWords = spoken.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+    const targetWords = target.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/)
+        .map(normalizeWord).filter(w => w.length > 0);
+    const spokenWords = spoken.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/)
+        .map(normalizeWord).filter(w => w.length > 0);
 
     // Count matching words (in correct position order)
     let matches = 0;

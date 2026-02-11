@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>녹화 공유 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        body {
+            background: var(--bg-light);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .share-container {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+        }
+
+        .share-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .logo-text {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .video-container {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: black;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+        }
+
+        .share-body {
+            padding: 24px;
+        }
+
+        .recording-info {
+            margin-bottom: 24px;
+        }
+
+        .student-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .recording-date {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .script-box {
+            background: var(--bg-light);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 24px;
+        }
+
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .script-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-dark);
+        }
+
+        .script-content {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-dark);
+        }
+
+        .feedback-box {
+            border: 2px solid var(--primary-pale);
+            background: #f8fcfb;
+            /* Mint-ish tint */
+            padding: 16px;
+            border-radius: var(--radius-md);
+        }
+
+        .feedback-title {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sticker-row {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .sticker {
+            font-size: 1.5rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-gray);
+        }
+    </style>
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../favicon.png">
+</head>
+
+<body>
+
+    <div class="share-container" id="container">
+        <div class="share-header">
+            <div class="logo-text">TES Speaking</div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <!-- Not used anymore as data is instant from URL -->
+        </div>
+
+        <div id="content">
+            <div class="video-container">
+                <video class="video-player" id="videoPlayer" controls playsinline>
+                    <source src="" type="video/webm">
+                    브라우저가 비디오를 지원하지 않습니다.
+                </video>
+            </div>
+
+            <div class="share-body">
+                <div class="recording-info">
+                    <div class="student-name" id="studentName"></div>
+                    <div class="recording-date" id="recordingDate"></div>
+                </div>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-title">📝 스크립트</span>
+                    </div>
+                    <div class="script-content" id="scriptContent">
+                        <!-- Script goes here -->
+                    </div>
+                </div>
+
+                <div class="feedback-box" id="feedbackSection" style="display: none;">
+                    <div class="feedback-title">
+                        <i class="ti ti-message-circle-2"></i> 선생님 피드백
+                    </div>
+                    <div id="feedbackText" style="color: var(--text-dark); line-height: 1.5;"></div>
+                    <div class="sticker-row" id="stickerRow"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // 1. Get Params
+            const videoUrl = urlParams.get('video');
+            const name = urlParams.get('name');
+            const date = urlParams.get('date');
+            const scriptEn = urlParams.get('scriptEn');
+            const scriptKr = urlParams.get('scriptKr');
+            const scriptRaw = urlParams.get('script');
+            const feedback = urlParams.get('feedback');
+            const stickers = urlParams.get('stickers');
+
+            if (!videoUrl) {
+                alert('잘못된 접근입니다.');
+                return;
+            }
+
+            // 2. Render Video
+            const videoPlayer = document.getElementById('videoPlayer');
+            videoPlayer.querySelector('source').src = videoUrl;
+            videoPlayer.load();
+
+            // 3. Render Info
+            document.getElementById('studentName').textContent = `${name || '학생'}의 스피킹`;
+
+            if (date) {
+                const dateObj = new Date(date);
+                if (!isNaN(dateObj.getTime())) {
+                    document.getElementById('recordingDate').textContent = dateObj.toLocaleDateString('ko-KR', {
+                        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    });
+                } else {
+                    document.getElementById('recordingDate').textContent = date;
+                }
+            } else {
+                document.getElementById('recordingDate').textContent = '';
+            }
+
+            // 4. Render Script
+            const scriptContainer = document.getElementById('scriptContent');
+            if (scriptEn || scriptKr) {
+                scriptContainer.innerHTML = `
+                    <p class="en-text" style="font-size:1.1rem; font-weight:500; margin-bottom:8px;">${scriptEn || ''}</p>
+                    <p class="kr-text" style="color:var(--text-gray); font-size:0.95rem;">${scriptKr || ''}</p>
+                `;
+            } else if (scriptRaw) {
+                try {
+                    const parsed = JSON.parse(scriptRaw);
+                    if (Array.isArray(parsed)) {
+                        scriptContainer.innerHTML = parsed.map(s => `<p>${s.en}</p><p style="color:gray; font-size:0.9em">${s.kr}</p>`).join('');
+                    } else {
+                        scriptContainer.textContent = scriptRaw;
+                    }
+                } catch (e) {
+                    scriptContainer.textContent = scriptRaw;
+                }
+            } else {
+                scriptContainer.innerHTML = '<span style="color:var(--text-gray)">스크립트 정보 없음</span>';
+            }
+
+            // 5. Render Feedback
+            if (feedback || stickers) {
+                document.getElementById('feedbackSection').style.display = 'block';
+                document.getElementById('feedbackText').textContent = feedback || '확인 완료';
+
+                const count = parseInt(stickers || '0');
+                if (count > 0) {
+                    document.getElementById('stickerRow').innerHTML = '⭐'.repeat(count);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -471,6 +471,68 @@ async function updateRecordingFeedback(recordingId, feedback, stickerCount) {
     return { data, error };
 }
 
+// Get single recording by ID (for sharing)
+async function getRecordingById(id) {
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Supabase not initialized' };
+
+    // 1. Get recording
+    const { data: recording, error } = await client
+        .from('recordings')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) return { data: null, error };
+    if (!recording) return { data: null, error: 'Recording not found' };
+
+    // 2. Get student name
+    let studentName = '학생';
+    if (recording.student_id) {
+        const { data: student } = await client
+            .from('students')
+            .select('name')
+            .eq('id', recording.student_id)
+            .single();
+
+        if (student) studentName = student.name;
+    }
+
+    // Combine
+    return { data: { ...recording, student_name: studentName }, error: null };
+}
+
+// Get problem by ID (with sample fallback)
+async function getProblemById(id) {
+    const client = await getSupabase();
+
+    // 1. Try DB
+    if (client) {
+        try {
+            const { data, error } = await client
+                .from('problems')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (data) return { data, error: null };
+        } catch (e) {
+            // Ignore DB error, use fallback
+        }
+    }
+
+    // 2. Fallback Sample Data
+    const samples = [
+        { id: '1', sentence_kr: '나는 학교에 갑니다.', sentence_en: 'I go to school.' },
+        { id: '2', sentence_kr: '오늘 날씨가 좋습니다.', sentence_en: 'The weather is nice today.' },
+        { id: '3', sentence_kr: '저는 영어를 공부합니다.', sentence_en: 'I study English.' }
+    ];
+    const found = samples.find(p => p.id == id); // loose equality for string/number
+
+    if (found) return { data: found, error: null };
+    return { data: null, error: 'Problem not found' };
+}
+
 // ============================================
 // Storage Functions
 // ============================================

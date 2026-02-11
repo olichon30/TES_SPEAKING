@@ -154,6 +154,8 @@
             margin-bottom: 16px;
         }
     </style>
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../favicon.png">
 </head>
 
 <body>
@@ -304,6 +306,9 @@
                                 <button class="btn btn-secondary" onclick="downloadVideo('${url}', '${rec.name}')">
                                     <i class="ti ti-download"></i> 다운로드
                                 </button>
+                                <button class="btn btn-secondary" onclick="shareVideo('${rec.id}')">
+                                    <i class="ti ti-share"></i> 공유
+                                </button>
                                 <button class="btn btn-secondary" onclick="deleteVideo('${path}')">
                                     <i class="ti ti-trash"></i> 삭제
                                 </button>
@@ -357,6 +362,79 @@
             } catch (e) {
                 console.error('Delete error:', e);
                 showToast('삭제 실패', 'error');
+            }
+        }
+
+        async function shareVideo(id) {
+            try {
+                // Find recording
+                const rec = recordings.find(r => r.id === id);
+                if (!rec) {
+                    showToast('녹화 정보를 찾을 수 없습니다', 'error');
+                    return;
+                }
+
+                showToast('공유 링크 생성 중...');
+
+                // 1. Get Public Video URL
+                const path = `${studentId}/${rec.name}`;
+                const { data: urlData } = supabaseClient.storage.from('recordings').getPublicUrl(path);
+                const publicUrl = urlData.publicUrl;
+
+                // 2. Fetch Script (Problem)
+                let scriptEn = '';
+                let scriptKr = '';
+
+                if (rec.problem_id) {
+                    // We try to fetch problem details. Since teacher is logged in, this should work.
+                    // We need to use getProblemById from supabase.js (make sure it's available or use direct query)
+                    // Assuming getProblemById is available and imported.
+                    try {
+                        // Quick direct query to be safe given context constraints
+                        const { data: prob } = await supabaseClient
+                            .from('problems')
+                            .select('sentence_en, sentence_kr')
+                            .eq('id', rec.problem_id)
+                            .single();
+
+                        if (prob) {
+                            scriptEn = prob.sentence_en;
+                            scriptKr = prob.sentence_kr;
+                        } else {
+                            // Check samples/fallback if DB failed or empty
+                            const samples = [
+                                { id: '1', sentence_kr: '나는 학교에 갑니다.', sentence_en: 'I go to school.' },
+                                { id: '2', sentence_kr: '오늘 날씨가 좋습니다.', sentence_en: 'The weather is nice today.' },
+                                { id: '3', sentence_kr: '저는 영어를 공부합니다.', sentence_en: 'I study English.' }
+                            ];
+                            const sample = samples.find(s => s.id == rec.problem_id);
+                            if (sample) {
+                                scriptEn = sample.sentence_en;
+                                scriptKr = sample.sentence_kr;
+                            }
+                        }
+                    } catch (e) { console.warn('Script fetch failed', e); }
+                }
+
+                // 3. Construct URL
+                const params = new URLSearchParams();
+                params.append('video', publicUrl);
+                params.append('name', studentName || '학생');
+                params.append('date', rec.created_at);
+                if (scriptEn) params.append('scriptEn', scriptEn);
+                if (scriptKr) params.append('scriptKr', scriptKr);
+                if (rec.feedback) params.append('feedback', rec.feedback);
+                if (rec.stickers) params.append('stickers', rec.stickers);
+
+                const shareUrl = `${window.location.origin}/pages/share-recording.html?${params.toString()}`;
+
+                // 4. Copy
+                await navigator.clipboard.writeText(shareUrl);
+                showToast('공유 링크가 복사되었습니다!', 'success');
+
+            } catch (err) {
+                console.error('Share failed', err);
+                showToast('공유 실패', 'error');
             }
         }
     </script>

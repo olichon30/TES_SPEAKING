@@ -96,6 +96,8 @@
             color: var(--text-gray);
         }
     </style>
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../favicon.png">
 </head>
 
 <body>
@@ -168,17 +170,17 @@
             setupBackButton();
         });
 
-        // Parse series name from textbook name
+        // Fallback: Parse series name from textbook name (when no folder assigned)
         function parseSeriesName(textbookName) {
             let series = textbookName.replace(/_L\d+$/i, '').replace(/ L\d+$/i, '');
             series = series.replace(/_/g, ' ');
             return series.trim();
         }
 
-        // Parse level from textbook name
-        function parseLevel(textbookName) {
+        // Parse display name from textbook name
+        function parseDisplayName(textbookName) {
             const match = textbookName.match(/[_\s]L(\d+)$/i);
-            return match ? `L${match[1]}` : textbookName;
+            return match ? `L${match[1]}` : textbookName.replace(/_/g, ' ');
         }
 
         async function loadClassData() {
@@ -224,26 +226,31 @@
                     ]
                 }];
 
-                // Group textbooks by series
+                // Group textbooks by folder (from DB) or auto-parse fallback
                 for (const textbook of allTextbooks) {
-                    const seriesName = parseSeriesName(textbook.name);
-                    if (!seriesMap[seriesName]) {
-                        seriesMap[seriesName] = [];
+                    // Use DB folder if set, otherwise fallback to auto-parse
+                    const folderName = (textbook.folder && textbook.folder.trim())
+                        ? textbook.folder.trim()
+                        : parseSeriesName(textbook.name);
+
+                    if (!seriesMap[folderName]) {
+                        seriesMap[folderName] = [];
                     }
 
                     const { data: units } = await getUnitsByTextbook(textbook.id);
 
-                    seriesMap[seriesName].push({
+                    seriesMap[folderName].push({
                         id: textbook.id,
                         name: textbook.name,
-                        displayName: parseLevel(textbook.name),
+                        displayName: parseDisplayName(textbook.name),
                         icon: textbook.icon || '<i class="ti ti-book-filled"></i>',
                         unitCount: units?.length || 0
                     });
                 }
 
-                // Sort by level
+                // Sort textbooks within each folder by display name
                 for (const series in seriesMap) {
+                    if (series === 'SAMPLE CLASS') continue;
                     seriesMap[series].sort((a, b) => {
                         const levelA = parseInt(a.displayName.replace(/\D/g, '')) || 0;
                         const levelB = parseInt(b.displayName.replace(/\D/g, '')) || 0;
