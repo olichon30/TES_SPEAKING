@@ -8,6 +8,15 @@
     "description": "TES Speaking - 누구나 쉽게 말하는 영어 스피킹 필수 앱. 녹음, 피드백, 공유 기능까지!",
     "orientation": "portrait",
     "id": "/",
+    "scope": "/",
+    "display_override": [
+        "window-controls-overlay",
+        "minimal-ui",
+        "standalone",
+        "browser"
+    ],
+    "prefer_related_applications": false,
+    "related_applications": [],
     "categories": [
         "education",
         "productivity"
