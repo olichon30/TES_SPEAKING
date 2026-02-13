@@ -145,6 +145,43 @@
             color: var(--text-gray);
         }
 
+        .academy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, var(--primary), #6D28D9);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logout-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+            cursor: pointer;
+            color: var(--text-gray);
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .logout-btn:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+            border-color: #FECACA;
+        }
+
         .filter-tabs {
             display: flex;
             gap: 8px;
@@ -178,9 +215,19 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <a href="../index.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
-            <h1 class="header-title">학생 학습 현황</h1>
-            <button class="icon-btn" onclick="refreshData()"><i class="ti ti-refresh"></i></button>
+            <div>
+                <h1 class="header-title">학생 학습 현황</h1>
+                <span class="academy-badge" id="academyBadge" style="display:none;">
+                    <i class="ti ti-building"></i>
+                    <span id="academyName"></span>
+                </span>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="refreshData()"><i class="ti ti-refresh"></i></button>
+                <a href="mypage.html" class="logout-btn" style="text-decoration:none;">
+                    <i class="ti ti-user-circle"></i> 마이페이지
+                </a>
+            </div>
         </header>
 
         <div class="content-area" style="padding-bottom: 20px;">
@@ -254,8 +301,37 @@
         let currentFilter = 'all';
 
         document.addEventListener('DOMContentLoaded', async () => {
+            // Auth guard: check teacher session
+            const { data: session } = await getTeacherSession();
+            // console.log('🔍 Dashboard Auth Check:', session); // Debug
+
+            if (!session || !session.user) {
+                console.log('❌ No session, redirecting to login');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Academy context check
+            const academy = getCurrentAcademy();
+            if (!academy) {
+                window.location.href = 'academy-setup.html';
+                return;
+            }
+
+            // Show academy badge
+            document.getElementById('academyName').textContent = academy.name;
+            document.getElementById('academyBadge').style.display = 'inline-flex';
+
             await loadDashboardData();
         });
+
+        async function handleLogout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                await teacherLogout();
+                sessionStorage.removeItem('currentAcademy');
+                window.location.href = 'login.html';
+            }
+        }
 
         async function loadDashboardData() {
             try {
@@ -273,11 +349,8 @@
                     return;
                 }
 
-                // Get all students
-                const { data: students, error } = await client
-                    .from('students')
-                    .select('*')
-                    .order('name', { ascending: true });
+                // Get students (filtered by academy via getStudents)
+                const { data: students, error } = await getStudents();
 
                 console.log('📊 Students query result:', { students, error });
 
@@ -286,7 +359,7 @@
                     throw error;
                 }
 
-                allStudents = students || [];
+                allStudents = (students || []).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                 console.log('📊 Total students:', allStudents.length);
 
                 // Get recordings for each student

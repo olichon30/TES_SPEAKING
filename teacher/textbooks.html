@@ -123,7 +123,7 @@
         .textbook-item {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             padding: 12px 16px;
             background: white;
             border-radius: 12px;
@@ -156,20 +156,89 @@
             align-items: center;
             justify-content: center;
             font-size: 20px;
+            flex-shrink: 0;
         }
 
         .textbook-item-info {
             flex: 1;
+            min-width: 0;
         }
 
         .textbook-item-name {
             font-weight: 600;
             color: var(--text-dark);
+            word-break: break-all;
         }
 
         .textbook-item-meta {
             font-size: 0.85rem;
             color: var(--text-gray);
+        }
+
+        .textbook-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .action-btn-move {
+            background: var(--primary-pale);
+            color: var(--primary);
+        }
+
+        .action-btn-move:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .action-btn-delete {
+            background: #fff0f0;
+            color: #e03131;
+        }
+
+        .action-btn-delete:hover {
+            background: #e03131;
+            color: white;
+        }
+
+        /* Folder Select Modal */
+        .folder-select-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .folder-select-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-light);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .folder-select-item:hover {
+            border-color: var(--primary);
+            background: var(--primary-pale);
         }
 
         /* Folder Detail Modal */
@@ -271,7 +340,7 @@
             <div class="section-header">
                 <h3 style="margin: 0;">📄 교재 목록</h3>
                 <p style="font-size: 0.9rem; color: var(--text-gray); margin: 0;">
-                    폴더로 드래그하여 정리하세요
+                    폴더 이동 또는 삭제 가능
                 </p>
             </div>
 
@@ -314,6 +383,20 @@
                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px;">
             <button class="btn btn-primary btn-block" onclick="createNewFolder()"
                 style="width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px;">생성</button>
+        </div>
+    </div>
+
+    <!-- Move to Folder Modal -->
+    <div class="modal" id="moveFolderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">📁 폴더 선택</h3>
+                <button class="close-btn" onclick="closeMoveFolderModal()">&times;</button>
+            </div>
+            <p style="color: var(--text-gray); margin-bottom: 16px; font-size: 0.9rem;">이동할 폴더를 선택하세요</p>
+            <div class="folder-select-list" id="folderSelectList">
+                <!-- Folder options rendered here -->
+            </div>
         </div>
     </div>
 
@@ -413,8 +496,13 @@
                         <div class="textbook-item-name">${tb.name}</div>
                         <div class="textbook-item-meta">${tb.grade || ''}</div>
                     </div>
-                    <div class="textbook-item-action">
-                        <i class="ti ti-grip-vertical" style="color: var(--text-light);"></i>
+                    <div class="textbook-item-actions">
+                        <button class="action-btn action-btn-move" onclick="event.stopPropagation(); openMoveFolderModal('${tb.id}')" title="폴더로 이동">
+                            <i class="ti ti-folder-plus"></i>
+                        </button>
+                        <button class="action-btn action-btn-delete" onclick="event.stopPropagation(); deleteTextbook('${tb.id}')" title="삭제">
+                            <i class="ti ti-trash"></i>
+                        </button>
                     </div>
                 </div>
             `).join('');
@@ -508,6 +596,67 @@
             }
         }
 
+
+        // ================= Move to Folder Modal (Mobile Friendly) =================
+
+        let pendingMoveTextbookId = null;
+
+        function openMoveFolderModal(textbookId) {
+            pendingMoveTextbookId = textbookId;
+            const list = document.getElementById('folderSelectList');
+            const sortedFolders = Array.from(folders).sort((a, b) =>
+                a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+            );
+
+            if (sortedFolders.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">폴더가 없습니다. 먼저 폴더를 만들어 주세요.</p>';
+            } else {
+                list.innerHTML = sortedFolders.map(fname => `
+                    <div class="folder-select-item" onclick="confirmMoveToFolder('${fname}')">
+                        <i class="ti ti-folder" style="font-size:24px; color:var(--primary);"></i>
+                        <span style="font-weight:500;">${fname}</span>
+                        <span style="margin-left:auto; color:var(--text-gray); font-size:0.85rem;">${allTextbooks.filter(t => t.folder === fname).length}개</span>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('moveFolderModal').classList.add('show');
+        }
+
+        function closeMoveFolderModal() {
+            document.getElementById('moveFolderModal').classList.remove('show');
+            pendingMoveTextbookId = null;
+        }
+
+        async function confirmMoveToFolder(folderName) {
+            if (!pendingMoveTextbookId) return;
+
+            const id = pendingMoveTextbookId;
+            closeMoveFolderModal();
+
+            const tbIndex = allTextbooks.findIndex(t => t.id === id);
+            if (tbIndex === -1) return;
+
+            const oldFolder = allTextbooks[tbIndex].folder;
+            allTextbooks[tbIndex].folder = folderName;
+            renderUI();
+
+            try {
+                const client = await getSupabase();
+                const { error } = await client
+                    .from('textbooks')
+                    .update({ folder: folderName })
+                    .eq('id', id);
+
+                if (error) throw error;
+                showToast(`'${folderName}' 폴더로 이동됨`, 'success');
+            } catch (err) {
+                console.error('Move failed:', err);
+                showToast('이동 실패', 'error');
+                allTextbooks[tbIndex].folder = oldFolder;
+                renderUI();
+            }
+        }
 
         // ================= Folder Management =================
 

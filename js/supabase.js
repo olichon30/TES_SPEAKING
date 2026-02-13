@@ -103,16 +103,22 @@ function handleError(error, context = '') {
 // Student Functions
 // ============================================
 
-// Get all students
+// Get all students (filtered by current academy)
 async function getStudents() {
     const client = await getSupabase();
     if (!client) return { data: [], error: 'Supabase not initialized' };
 
-    const { data, error } = await client
+    let query = client
         .from('students')
         .select('*')
         .order('created_at', { ascending: false });
 
+    const academyId = getCurrentAcademyId();
+    if (academyId) {
+        query = query.eq('academy_id', academyId);
+    }
+
+    const { data, error } = await query;
     return { data, error };
 }
 
@@ -143,9 +149,15 @@ async function createStudent(name, grade) {
         return { data: null, error: '이름을 입력해주세요' };
     }
 
+    const insertData = { name: safeName, grade: safeGrade };
+    const academyId = getCurrentAcademyId();
+    if (academyId) {
+        insertData.academy_id = academyId;
+    }
+
     const { data, error } = await client
         .from('students')
-        .insert([{ name: safeName, grade: safeGrade }])
+        .insert([insertData])
         .select()
         .single();
 
@@ -156,7 +168,7 @@ async function createStudent(name, grade) {
     return { data, error: null };
 }
 
-// Find student by name (grade is optional, for updating)
+// Find student by name (filtered by current academy)
 async function findStudent(name, grade = null) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
@@ -164,13 +176,20 @@ async function findStudent(name, grade = null) {
     // Sanitize inputs
     const safeName = sanitizeInput(name);
 
-    // Search by name only - use limit(1) instead of single() to avoid error when duplicates exist
-    const { data: results, error } = await client
+    // Search by name, filtered by academy
+    let query = client
         .from('students')
         .select('*')
         .eq('name', safeName)
         .order('created_at', { ascending: true })
         .limit(1);
+
+    const academyId = getCurrentAcademyId();
+    if (academyId) {
+        query = query.eq('academy_id', academyId);
+    }
+
+    const { data: results, error } = await query;
 
     // Get first result (or null if empty)
     const data = results && results.length > 0 ? results[0] : null;
@@ -208,16 +227,22 @@ async function findStudentsByName(name) {
 // Textbook Functions
 // ============================================
 
-// Get all textbooks
+// Get all textbooks (filtered by current academy)
 async function getTextbooks() {
     const client = await getSupabase();
     if (!client) return { data: [], error: 'Supabase not initialized' };
 
-    const { data, error } = await client
+    let query = client
         .from('textbooks')
         .select('*')
         .order('created_at', { ascending: true });
 
+    const academyId = getCurrentAcademyId();
+    if (academyId) {
+        query = query.eq('academy_id', academyId);
+    }
+
+    const { data, error } = await query;
     return { data, error };
 }
 
@@ -230,6 +255,9 @@ async function createTextbook(name, grade = null, icon = null) {
     const insertData = { name };
     if (grade) insertData.grade = grade;
     if (icon) insertData.icon = icon;
+
+    const academyId = getCurrentAcademyId();
+    if (academyId) insertData.academy_id = academyId;
 
     const { data, error } = await client
         .from('textbooks')
@@ -415,12 +443,12 @@ async function getStudentRecordings(studentId) {
     return { data, error };
 }
 
-// Get all recordings (for teacher)
+// Get all recordings (for teacher, filtered by academy)
 async function getAllRecordings() {
     const client = await getSupabase();
     if (!client) return { data: [], error: 'Supabase not initialized' };
 
-    const { data, error } = await client
+    let query = client
         .from('recordings')
         .select(`
             *,
@@ -429,6 +457,12 @@ async function getAllRecordings() {
         `)
         .order('created_at', { ascending: false });
 
+    const academyId = getCurrentAcademyId();
+    if (academyId) {
+        query = query.eq('academy_id', academyId);
+    }
+
+    const { data, error } = await query;
     return { data, error };
 }
 
@@ -437,15 +471,20 @@ async function createRecording(studentId, problemId, videoUrl) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
 
+    const insertData = {
+        student_id: studentId,
+        problem_id: problemId,
+        video_url: videoUrl,
+        status: 'submitted',
+        sticker_count: 0
+    };
+
+    const academyId = getCurrentAcademyId();
+    if (academyId) insertData.academy_id = academyId;
+
     const { data, error } = await client
         .from('recordings')
-        .insert([{
-            student_id: studentId,
-            problem_id: problemId,
-            video_url: videoUrl,
-            status: 'submitted',
-            sticker_count: 0
-        }])
+        .insert([insertData])
         .select()
         .single();
 
@@ -565,25 +604,26 @@ function koreanToRoman(korean) {
     return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
-// Upload video to Supabase Storage
+// Upload video - Firebase Storage (primary) / Supabase Storage (fallback)
 async function uploadVideo(file, studentId, studentName = '', unitTitle = '') {
-    const client = await getSupabase();
-    if (!client) return { data: null, error: 'Supabase not initialized' };
+    // Try Firebase Storage first (5GB free)
+    if (typeof uploadVideoToFirebase === 'function') {
+        console.log('📹 Using Firebase Storage');
+        return await uploadVideoToFirebase(file, studentId, studentName, unitTitle);
+    }
 
-    // Create filename: EnglishName_Unit_date.webm
+    // Fallback to Supabase Storage
+    console.log('📹 Fallback: Using Supabase Storage');
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Storage not initialized' };
+
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Convert Korean name to Romanized English
     const englishName = koreanToRoman(studentName) || 'Student';
-
-    // Extract unit number if possible (e.g., "Unit 1" -> "U1")
     const unitMatch = unitTitle.match(/\d+/);
     const unitNum = unitMatch ? `U${unitMatch[0]}` : 'Rec';
-
     const fileName = `${studentId}/${englishName}_${unitNum}_${dateStr}.webm`;
-
-    console.log('📹 Upload:', { studentName, englishName, unitNum, fileName });
 
     const { data, error } = await client
         .storage
@@ -595,7 +635,6 @@ async function uploadVideo(file, studentId, studentName = '', unitTitle = '') {
 
     if (error) return { data: null, error };
 
-    // Get public URL
     const { data: urlData } = client
         .storage
         .from('recordings')
@@ -608,7 +647,7 @@ async function uploadVideo(file, studentId, studentName = '', unitTitle = '') {
 // Teacher Auth Functions
 // ============================================
 
-// Teacher login
+// Teacher login with email/password
 async function teacherLogin(email, password) {
     const client = await getSupabase();
     if (!client) return { data: null, error: 'Supabase not initialized' };
@@ -621,11 +660,27 @@ async function teacherLogin(email, password) {
     return { data, error };
 }
 
+// Teacher login with Google OAuth
+async function teacherLoginWithGoogle() {
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Supabase not initialized' };
+
+    const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin + '/teacher/auth-callback.html'
+        }
+    });
+
+    return { data, error };
+}
+
 // Teacher logout
 async function teacherLogout() {
     const client = await getSupabase();
     if (!client) return { error: 'Supabase not initialized' };
 
+    sessionStorage.removeItem('currentAcademy');
     const { error } = await client.auth.signOut();
     return { error };
 }
@@ -637,6 +692,144 @@ async function getTeacherSession() {
 
     const { data, error } = await client.auth.getSession();
     return { data: data?.session, error };
+}
+
+// ============================================
+// Academy Functions
+// ============================================
+
+// Generate random academy code (6 chars)
+function generateAcademyCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// Create new academy
+async function createAcademy(name) {
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Supabase not initialized' };
+
+    const { data: session } = await client.auth.getSession();
+    if (!session?.session?.user) return { data: null, error: 'Not authenticated' };
+
+    const userId = session.session.user.id;
+    const code = generateAcademyCode();
+
+    // Create academy
+    const { data: academy, error: acError } = await client
+        .from('academies')
+        .insert([{ name: sanitizeInput(name), code, owner_id: userId }])
+        .select()
+        .single();
+
+    if (acError) return { data: null, error: acError };
+
+    // Add creator as owner in academy_teachers
+    const { error: atError } = await client
+        .from('academy_teachers')
+        .insert([{ academy_id: academy.id, user_id: userId, role: 'owner' }]);
+
+    if (atError) return { data: null, error: atError };
+
+    return { data: academy, error: null };
+}
+
+// Join academy by code
+async function joinAcademyByCode(code) {
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Supabase not initialized' };
+
+    const { data: session } = await client.auth.getSession();
+    if (!session?.session?.user) return { data: null, error: 'Not authenticated' };
+
+    const userId = session.session.user.id;
+
+    // Find academy by code
+    const { data: academy, error: findError } = await client
+        .from('academies')
+        .select('*')
+        .eq('code', code.toUpperCase().trim())
+        .single();
+
+    if (findError || !academy) return { data: null, error: '학원 코드를 찾을 수 없습니다' };
+
+    // Check if already a member
+    const { data: existing } = await client
+        .from('academy_teachers')
+        .select('id')
+        .eq('academy_id', academy.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existing) return { data: academy, error: null }; // Already a member
+
+    // Add as teacher
+    const { error: joinError } = await client
+        .from('academy_teachers')
+        .insert([{ academy_id: academy.id, user_id: userId, role: 'teacher' }]);
+
+    if (joinError) return { data: null, error: joinError };
+
+    return { data: academy, error: null };
+}
+
+// Get academies for current user
+async function getMyAcademies() {
+    const client = await getSupabase();
+    if (!client) return { data: [], error: 'Supabase not initialized' };
+
+    const { data: session } = await client.auth.getSession();
+    if (!session?.session?.user) return { data: [], error: 'Not authenticated' };
+
+    const userId = session.session.user.id;
+
+    const { data, error } = await client
+        .from('academy_teachers')
+        .select('role, academies(*)')
+        .eq('user_id', userId);
+
+    if (error) return { data: [], error };
+
+    // Flatten: [{role, academy: {...}}]
+    const academies = (data || []).map(row => ({
+        ...row.academies,
+        role: row.role
+    }));
+
+    return { data: academies, error: null };
+}
+
+// Get academy by code (for student login)
+async function getAcademyByCode(code) {
+    const client = await getSupabase();
+    if (!client) return { data: null, error: 'Supabase not initialized' };
+
+    const { data, error } = await client
+        .from('academies')
+        .select('id, name, code')
+        .eq('code', code.toUpperCase().trim())
+        .single();
+
+    return { data, error };
+}
+
+// Store/retrieve current academy in session
+function setCurrentAcademy(academy) {
+    sessionStorage.setItem('currentAcademy', JSON.stringify(academy));
+}
+
+function getCurrentAcademy() {
+    const data = sessionStorage.getItem('currentAcademy');
+    return data ? JSON.parse(data) : null;
+}
+
+function getCurrentAcademyId() {
+    const academy = getCurrentAcademy();
+    return academy ? academy.id : null;
 }
 
 // ============================================

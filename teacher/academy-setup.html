@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>학원 설정 - TES Speaking</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #e8f0fe 0%, #f0e6f6 30%, #e8f6f6 60%, #dbeafe 100%);
+            position: relative;
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-orb-1 {
+            width: 260px;
+            height: 260px;
+            background: radial-gradient(circle, #7C3AED 0%, transparent 70%);
+            top: -60px;
+            right: -30px;
+            animation-duration: 11s;
+        }
+
+        .bg-orb-2 {
+            width: 220px;
+            height: 220px;
+            background: radial-gradient(circle, #2D9596 0%, transparent 70%);
+            bottom: -50px;
+            left: -30px;
+            animation-duration: 13s;
+            animation-delay: -4s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px) scale(1);
+            }
+
+            50% {
+                transform: translateY(-20px) scale(1.03);
+            }
+        }
+
+        .setup-card {
+            position: relative;
+            z-index: 1;
+            width: 92%;
+            max-width: 480px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 28px;
+            padding: 40px 32px 36px;
+            box-shadow: 0 8px 32px rgba(45, 149, 150, 0.12);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, #2D9596, #7C3AED);
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1A1A2E;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: #64748B;
+        }
+
+        /* User info bar */
+        .user-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(124, 58, 237, 0.04);
+            border: 1px solid rgba(124, 58, 237, 0.1);
+            border-radius: 14px;
+            margin-bottom: 28px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            object-fit: cover;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1A1A2E;
+        }
+
+        .user-email {
+            font-size: 0.8rem;
+            color: #64748B;
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #94A3B8;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            color: #EF4444;
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        /* Tab */
+        .tab-group {
+            display: flex;
+            background: #F1F5F9;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #64748B;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #1A1A2E;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            font-weight: 600;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Form */
+        .form-group {
+            text-align: left;
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+            color: #94A3B8;
+        }
+
+        .form-input-styled {
+            width: 100%;
+            padding: 15px 16px 15px 48px;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-family: 'Noto Sans KR', sans-serif;
+            background: rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+            outline: none;
+            color: #1A1A2E;
+        }
+
+        .form-input-styled::placeholder {
+            color: #94A3B8;
+        }
+
+        .form-input-styled:focus {
+            border-color: #7C3AED;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.08);
+        }
+
+        .form-input-styled.code-input {
+            text-align: center;
+            letter-spacing: 6px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding-left: 16px;
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 16px;
+            margin-top: 8px;
+            background: linear-gradient(135deg, #2D9596 0%, #3B82F6 60%, #7C3AED 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            font-family: 'Noto Sans KR', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25);
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+        }
+
+        .hint-text {
+            text-align: center;
+            font-size: 0.825rem;
+            color: #94A3B8;
+            margin-top: 16px;
+        }
+
+        /* Existing academies list */
+        .academy-list {
+            margin-bottom: 20px;
+        }
+
+        .academy-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .academy-item:hover {
+            border-color: #7C3AED;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+        }
+
+        .academy-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #2D9596, #7C3AED);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .academy-info {
+            flex: 1;
+        }
+
+        .academy-name {
+            font-weight: 600;
+            color: #1A1A2E;
+            font-size: 0.95rem;
+        }
+
+        .academy-code {
+            font-size: 0.8rem;
+            color: #64748B;
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+
+        .academy-role {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .academy-role.owner {
+            background: rgba(124, 58, 237, 0.1);
+            color: #7C3AED;
+        }
+
+        .academy-role.teacher {
+            background: rgba(45, 149, 150, 0.1);
+            color: #2D9596;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #64748B;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .divider-line {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: #CBD5E1;
+            font-size: 0.8rem;
+        }
+
+        .divider-line::before,
+        .divider-line::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+
+        .divider-line::before {
+            margin-right: 12px;
+        }
+
+        .divider-line::after {
+            margin-left: 12px;
+        }
+    </style>
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../favicon.png">
+    <link rel="manifest" href="../manifest.json">
+</head>
+
+<body>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+
+    <div class="setup-card">
+        <div class="header">
+            <div class="header-icon">
+                <i class="ti ti-building"></i>
+            </div>
+            <h1>학원 설정</h1>
+            <p>학원을 만들거나 참여하세요</p>
+        </div>
+
+        <!-- User info -->
+        <div class="user-bar" id="userBar" style="display:none;">
+            <img id="userAvatar" class="user-avatar" src="" alt="">
+            <div class="user-info">
+                <div class="user-name" id="userName">선생님</div>
+                <div class="user-email" id="userEmail">email@example.com</div>
+            </div>
+            <button class="btn-logout" onclick="logout()" title="로그아웃">
+                <i class="ti ti-logout"></i>
+            </button>
+        </div>
+
+        <!-- Existing academies (if any) -->
+        <div id="existingSection" style="display:none;">
+            <div class="section-title">
+                <i class="ti ti-building"></i> 내 학원
+            </div>
+            <div class="academy-list" id="academyList"></div>
+            <div class="divider-line">또는 새로 추가</div>
+        </div>
+
+        <!-- Tabs: Create / Join -->
+        <div class="tab-group">
+            <button class="tab-btn active" onclick="switchTab('create')">학원 만들기</button>
+            <button class="tab-btn" onclick="switchTab('join')">코드로 참여</button>
+        </div>
+
+        <!-- Create Tab -->
+        <div class="tab-panel active" id="tab-create">
+            <div class="form-group">
+                <label class="form-label">학원 이름</label>
+                <div class="input-wrapper">
+                    <span class="input-icon"><i class="ti ti-building"></i></span>
+                    <input type="text" id="academyName" class="form-input-styled" placeholder="예: TES 어학원" required>
+                </div>
+            </div>
+            <button class="btn-action" onclick="handleCreate()">
+                <i class="ti ti-plus"></i> 학원 만들기
+            </button>
+            <p class="hint-text">생성 후 고유 코드가 발급됩니다</p>
+        </div>
+
+        <!-- Join Tab -->
+        <div class="tab-panel" id="tab-join">
+            <div class="form-group">
+                <label class="form-label">학원 코드</label>
+                <input type="text" id="academyCode" class="form-input-styled code-input" placeholder="ABC123"
+                    maxlength="6" required>
+            </div>
+            <button class="btn-action" onclick="handleJoin()">
+                <i class="ti ti-login"></i> 참여하기
+            </button>
+            <p class="hint-text">학원 관리자에게 코드를 받으세요</p>
+        </div>
+    </div>
+
+    <!-- Success Modal (after creating academy) -->
+    <div id="successModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+         background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000;">
+        <div style="background: white; border-radius: 24px; padding: 36px; width: 90%; max-width: 380px; text-align: center;
+                    box-shadow: 0 16px 48px rgba(0,0,0,0.15); animation: slideUp 0.3s ease-out;">
+            <div style="font-size: 3rem; margin-bottom: 16px;">🎉</div>
+            <h2 style="margin-bottom: 8px; color: #1A1A2E;">학원이 생성되었습니다!</h2>
+            <p style="color: #64748B; margin-bottom: 16px;">학원 코드를 학생들에게 공유하세요</p>
+            <div id="newCode" style="font-size: 2rem; font-weight: 800; letter-spacing: 6px; color: #7C3AED;
+                        padding: 16px; background: rgba(124,58,237,0.06); border-radius: 14px; margin-bottom: 20px;
+                        font-family: monospace;"></div>
+            <button onclick="copyCode()" style="width: 100%; padding: 12px; margin-bottom: 10px;
+                    background: rgba(124,58,237,0.08); border: none; border-radius: 12px;
+                    color: #7C3AED; font-weight: 600; cursor: pointer; font-family: 'Noto Sans KR', sans-serif;">
+                <i class="ti ti-copy"></i> 코드 복사
+            </button>
+            <button onclick="goToDashboard()" style="width: 100%; padding: 14px;
+                    background: linear-gradient(135deg, #2D9596, #7C3AED); color: white;
+                    border: none; border-radius: 14px; font-weight: 600; cursor: pointer;
+                    font-family: 'Noto Sans KR', sans-serif; font-size: 1rem;
+                    box-shadow: 0 4px 12px rgba(124,58,237,0.3);">
+                대시보드로 이동 →
+            </button>
+        </div>
+    </div>
+
+    <script src="../js/supabase.js"></script>
+    <script>
+        let currentUser = null;
+        let createdAcademy = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', async () => {
+            await new Promise(r => setTimeout(r, 800));
+
+            const { data: session } = await getTeacherSession();
+
+            if (!session || !session.user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUser = session.user;
+
+            // Show user info
+            const bar = document.getElementById('userBar');
+            bar.style.display = 'flex';
+            document.getElementById('userName').textContent =
+                currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
+            document.getElementById('userEmail').textContent = currentUser.email;
+
+            const avatarUrl = currentUser.user_metadata?.avatar_url;
+            if (avatarUrl) {
+                document.getElementById('userAvatar').src = avatarUrl;
+            } else {
+                document.getElementById('userAvatar').style.display = 'none';
+            }
+
+            // Load existing academies
+            await loadAcademies();
+        });
+
+        async function loadAcademies() {
+            const { data: academies } = await getMyAcademies();
+
+            if (academies && academies.length > 0) {
+                const section = document.getElementById('existingSection');
+                section.style.display = 'block';
+
+                const list = document.getElementById('academyList');
+                list.innerHTML = academies.map(ac => `
+                    <div class="academy-item" onclick="selectAcademy('${ac.id}', '${ac.name}', '${ac.code}', '${ac.role}')">
+                        <div class="academy-icon">
+                            <i class="ti ti-building"></i>
+                        </div>
+                        <div class="academy-info">
+                            <div class="academy-name">${ac.name}</div>
+                            <div class="academy-code">코드: ${ac.code}</div>
+                        </div>
+                        <span class="academy-role ${ac.role}">${ac.role === 'owner' ? '관리자' : '선생님'}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function selectAcademy(id, name, code, role) {
+            setCurrentAcademy({ id, name, code, role });
+            window.location.href = 'dashboard.html';
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', (tab === 'create' && i === 0) || (tab === 'join' && i === 1));
+            });
+            document.getElementById('tab-create').classList.toggle('active', tab === 'create');
+            document.getElementById('tab-join').classList.toggle('active', tab === 'join');
+        }
+
+        // Create academy
+        async function handleCreate() {
+            const name = document.getElementById('academyName').value.trim();
+            if (!name) {
+                showToast('학원 이름을 입력해주세요', 'error');
+                return;
+            }
+
+            showLoading('학원 생성 중...');
+            const { data, error } = await createAcademy(name);
+            hideLoading();
+
+            if (error) {
+                showToast('학원 생성 실패: ' + (error.message || error), 'error');
+                return;
+            }
+
+            createdAcademy = data;
+            setCurrentAcademy(data);
+
+            // Show success modal with code
+            document.getElementById('newCode').textContent = data.code;
+            document.getElementById('successModal').style.display = 'flex';
+        }
+
+        // Join academy
+        async function handleJoin() {
+            const code = document.getElementById('academyCode').value.trim();
+            if (!code || code.length < 6) {
+                showToast('학원 코드 6자리를 입력해주세요', 'error');
+                return;
+            }
+
+            showLoading('학원 참여 중...');
+            const { data, error } = await joinAcademyByCode(code);
+            hideLoading();
+
+            if (error) {
+                showToast('학원 참여 실패: ' + (error.message || error), 'error');
+                return;
+            }
+
+            setCurrentAcademy(data);
+            showToast('학원에 참여했습니다!', 'success');
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 800);
+        }
+
+        function copyCode() {
+            if (createdAcademy) {
+                navigator.clipboard.writeText(createdAcademy.code);
+                showToast('코드가 복사되었습니다!');
+            }
+        }
+
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+
+        async function logout() {
+            await teacherLogout();
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        }
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../service-worker.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed: ', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
